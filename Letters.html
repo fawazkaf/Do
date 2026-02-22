@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABC & أبجد - Letter Fun!</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Poppins:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #FF6B9D;
+    --yellow: #FFD93D;
+    --teal: #4ECDC4;
+    --purple: #A855F7;
+    --orange: #FF8C42;
+    --green: #6BCB77;
+    --blue: #4D96FF;
+    --bg: #FFF9F0;
+    --dark: #2D2D2D;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='28' font-size='28'>⭐</text></svg>") 16 16, auto;
+  }
+
+  /* Floating background bubbles */
+  .bg-bubbles {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.12;
+    animation: floatBubble linear infinite;
+  }
+  @keyframes floatBubble {
+    0% { transform: translateY(110vh) scale(0.8); opacity: 0; }
+    10% { opacity: 0.12; }
+    90% { opacity: 0.12; }
+    100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 30px 20px 20px;
+    animation: bounceIn 0.8s ease;
+  }
+  @keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    60% { transform: scale(1.1); }
+    80% { transform: scale(0.95); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  header h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    background: linear-gradient(135deg, var(--pink), var(--purple), var(--blue), var(--teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    line-height: 1.1;
+    filter: drop-shadow(3px 3px 0px rgba(0,0,0,0.15));
+  }
+
+  header .subtitle {
+    font-size: 1.3rem;
+    color: var(--dark);
+    font-weight: 700;
+    margin-top: 8px;
+    opacity: 0.7;
+  }
+
+  /* Mode Switcher */
+  .mode-switcher {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+
+  .mode-btn {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.4rem;
+    padding: 14px 32px;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+    letter-spacing: 0.5px;
+    position: relative;
+    top: 0;
+  }
+  .mode-btn:active { top: 4px; box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+  .mode-btn.active { transform: scale(1.05); }
+
+  #btn-en { background: var(--blue); color: white; }
+  #btn-ar { background: var(--green); color: white; font-size: 1.5rem; }
+  #btn-game { background: var(--orange); color: white; }
+
+  /* Section panels */
+  .panel {
+    display: none;
+    animation: fadeSlide 0.4s ease;
+  }
+  .panel.active { display: block; }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Letters Grid */
+  .letters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 16px;
+    padding: 10px 0;
+  }
+
+  .letter-card {
+    background: white;
+    border-radius: 24px;
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.12);
+    border: 3px solid transparent;
+    position: relative;
+    top: 0;
+    user-select: none;
+  }
+  .letter-card:hover { transform: scale(1.05) rotate(-2deg); }
+  .letter-card:active { top: 4px; box-shadow: 0 2px 0 rgba(0,0,0,0.12); transform: scale(0.98); }
+  .letter-card.pop {
+    animation: pop 0.35s ease;
+  }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3) rotate(5deg); }
+    100% { transform: scale(1); }
+  }
+
+  .letter-big {
+    font-family: 'Poppins', sans-serif;
+    font-size: 3.2rem;
+    line-height: 1;
+    display: block;
+  }
+  .letter-small {
+    font-size: 1.6rem;
+    display: block;
+    margin-top: 2px;
+    font-weight: 700;
+  }
+  .letter-word {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-top: 6px;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .letter-emoji {
+    font-size: 1.8rem;
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* Arabic specific */
+  .ar-card .letter-big { font-size: 2.8rem; direction: rtl; }
+  .ar-card .letter-small { font-size: 1.4rem; direction: rtl; }
+
+  /* GAME SECTION */
+  .game-tabs {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .game-tab {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.1rem;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    background: #e8e0f0;
+    color: var(--dark);
+    transition: all 0.2s;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  }
+  .game-tab.active { background: var(--purple); color: white; transform: scale(1.05); }
+
+  .game-panel { display: none; }
+  .game-panel.active { display: block; }
+
+  /* ===== GAME 1: Match Letter to Object ===== */
+  .match-game {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .match-prompt {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.4rem;
+    color: var(--dark);
+    margin-bottom: 16px;
+  }
+
+  /* The object card shown to the child */
+  .object-card {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    border-radius: 30px;
+    padding: 24px 40px;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.12);
+    margin-bottom: 28px;
+    animation: pulse 2s ease-in-out infinite;
+    min-width: 200px;
+  }
+  .object-emoji {
+    font-size: 6rem;
+    line-height: 1;
+    display: block;
+  }
+  .object-word {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.6rem;
+    margin-top: 10px;
+    color: var(--dark);
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+
+  .match-choices {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+  .choice-btn {
+    font-family: 'Poppins', sans-serif;
+    font-size: 3.8rem;
+    padding: 22px 10px;
+    border: 4px solid transparent;
+    border-radius: 24px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.12);
+    position: relative;
+    top: 0;
+    line-height: 1;
+  }
+  .choice-btn:hover { transform: scale(1.08); border-color: var(--purple); }
+  .choice-btn:active { top: 4px; box-shadow: 0 2px 0 rgba(0,0,0,0.12); }
+  .choice-btn.correct { background: var(--green); border-color: #3fa349; animation: correctPop 0.5s ease; }
+  .choice-btn.wrong { background: var(--pink); border-color: #cc4472; animation: shake 0.4s ease; }
+  @keyframes correctPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3) rotate(-5deg); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px) rotate(-3deg); }
+    75% { transform: translateX(10px) rotate(3deg); }
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.3rem;
+  }
+  .star-count {
+    background: var(--yellow);
+    padding: 8px 20px;
+    border-radius: 40px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  }
+
+  /* ===== GAME 2: Bubble Pop ===== */
+  .bubble-game {
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .bubble-prompt-text {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+  }
+  .bubble-target {
+    font-family: 'Poppins', sans-serif;
+    font-size: 5rem;
+    display: inline-block;
+    animation: float 2s ease-in-out infinite;
+    filter: drop-shadow(2px 4px 8px rgba(0,0,0,0.15));
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  .bubbles-container {
+    position: relative;
+    height: 380px;
+    background: linear-gradient(180deg, #e0f4ff 0%, #cce8ff 100%);
+    border-radius: 30px;
+    margin-top: 20px;
+    overflow: hidden;
+    box-shadow: inset 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .pop-bubble {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Poppins', sans-serif;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+    box-shadow: inset -4px -4px 12px rgba(0,0,0,0.15), inset 4px 4px 12px rgba(255,255,255,0.5);
+    animation: riseBubble linear forwards;
+    user-select: none;
+  }
+  .pop-bubble:hover { transform: scale(1.1); }
+  @keyframes riseBubble {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(-420px); opacity: 0.6; }
+  }
+  .pop-bubble.popped {
+    animation: popEffect 0.3s ease forwards;
+    pointer-events: none;
+  }
+  @keyframes popEffect {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.6); opacity: 0.7; }
+    100% { transform: scale(0); opacity: 0; }
+  }
+
+  /* Stars feedback */
+  .feedback-stars {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    pointer-events: none;
+    z-index: 999;
+    animation: starFeedback 1s ease forwards;
+  }
+  @keyframes starFeedback {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+    50% { transform: translate(-50%, -60%) scale(1.3); opacity: 1; }
+    100% { transform: translate(-50%, -80%) scale(1); opacity: 0; }
+  }
+
+  /* Game 3: Tracing dots */
+  .trace-game {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .trace-letter-display {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: 16px;
+  }
+  .trace-canvas-wrap {
+    background: white;
+    border-radius: 30px;
+    padding: 20px;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.12);
+    display: inline-block;
+    position: relative;
+  }
+  canvas {
+    border-radius: 16px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .trace-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .ctrl-btn {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.1rem;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+    transition: all 0.15s;
+    position: relative;
+    top: 0;
+  }
+  .ctrl-btn:active { top: 3px; box-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+  .btn-clear { background: var(--pink); color: white; }
+  .btn-next { background: var(--teal); color: white; }
+
+  /* Section headings */
+  .section-heading {
+    font-family: 'Poppins', sans-serif;
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 24px;
+    color: var(--dark);
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .letters-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+    .letter-big { font-size: 2.5rem; }
+    .match-big-letter { font-size: 5rem; }
+    .match-choices { gap: 10px; }
+    .choice-btn { font-size: 2.5rem; padding: 14px; }
+  }
+
+  /* Confetti particles */
+  .confetti-piece {
+    position: fixed;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 9999;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    0% { opacity: 1; transform: translateY(-20px) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }
+  }
+
+  .lang-flag {
+    font-size: 1.5rem;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Background bubbles -->
+<div class="bg-bubbles" id="bgBubbles"></div>
+
+<div class="container">
+  <header>
+    <h1>ABC & أبجد ✨</h1>
+    <p class="subtitle">Learn Letters & Have Fun! 🎉</p>
+  </header>
+
+  <!-- Mode Switcher -->
+  <div class="mode-switcher">
+    <button class="mode-btn active" id="btn-en" onclick="showPanel('english')">🔤 English</button>
+    <button class="mode-btn" id="btn-ar" onclick="showPanel('arabic')">🔤 عربي</button>
+    <button class="mode-btn" id="btn-game" onclick="showPanel('games')">🎮 Games!</button>
+  </div>
+
+  <!-- ENGLISH PANEL -->
+  <div class="panel active" id="panel-english">
+    <h2 class="section-heading">🌟 English Alphabet 🌟</h2>
+    <div class="letters-grid" id="en-grid"></div>
+  </div>
+
+  <!-- ARABIC PANEL -->
+  <div class="panel" id="panel-arabic">
+    <h2 class="section-heading">🌙 الحروف العربية 🌙</h2>
+    <div class="letters-grid" id="ar-grid"></div>
+  </div>
+
+  <!-- GAMES PANEL -->
+  <div class="panel" id="panel-games">
+    <h2 class="section-heading">🎮 Fun Games! 🎮</h2>
+    <div class="game-tabs">
+      <button class="game-tab active" onclick="showGame('match')">🎯 Match It!</button>
+      <button class="game-tab" onclick="showGame('bubble')">🫧 Bubble Pop!</button>
+      <button class="game-tab" onclick="showGame('trace')">✏️ Draw It!</button>
+    </div>
+
+    <!-- Game 1: Match Letter to Object -->
+    <div class="game-panel active" id="game-match">
+      <div class="match-game">
+        <div class="score-bar">
+          <span>⭐ Stars:</span>
+          <span class="star-count" id="match-score">0</span>
+          <button style="font-family:Poppins,sans-serif;font-size:1rem;padding:8px 20px;border:none;border-radius:30px;background:var(--blue);color:white;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.2);" onclick="initMatchGame()">🔄 New</button>
+          <button onclick="toggleMatchLang()" style="font-family:Poppins,sans-serif;font-size:1rem;padding:8px 20px;border:none;border-radius:30px;background:var(--teal);color:white;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.15);" id="match-lang-btn">🌐 عربي</button>
+        </div>
+        <p class="match-prompt" id="match-question">Which letter does this start with? 🔍</p>
+        <div class="object-card" id="match-object-card">
+          <span class="object-emoji" id="match-emoji">🍎</span>
+          <span class="object-word" id="match-word">Apple</span>
+        </div>
+        <div class="match-choices" id="match-choices"></div>
+      </div>
+    </div>
+
+    <!-- Game 2: Bubble Pop -->
+    <div class="game-panel" id="game-bubble">
+      <div class="bubble-game">
+        <div class="score-bar">
+          <span>💫 Pops:</span>
+          <span class="star-count" id="bubble-score">0</span>
+          <button style="font-family:Poppins,sans-serif;font-size:1rem;padding:8px 20px;border:none;border-radius:30px;background:var(--blue);color:white;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.2);" onclick="startBubbleGame()">🔄 Start</button>
+        </div>
+        <p class="bubble-prompt-text">Pop the bubble with: <span class="bubble-target" id="bubble-target">A</span></p>
+        <div class="bubbles-container" id="bubbles-container"></div>
+      </div>
+    </div>
+
+    <!-- Game 3: Drawing/Tracing -->
+    <div class="game-panel" id="game-trace">
+      <div class="trace-game">
+        <p class="trace-letter-display" id="trace-prompt">Draw the letter: <strong id="trace-letter" style="font-family:Poppins,sans-serif;font-size:2rem;color:var(--purple);">A</strong></p>
+        <div class="trace-canvas-wrap">
+          <canvas id="traceCanvas" width="340" height="300"></canvas>
+        </div>
+        <div class="trace-controls">
+          <button class="ctrl-btn btn-clear" onclick="clearCanvas()">🗑️ Clear</button>
+          <button class="ctrl-btn btn-next" onclick="nextTraceLetter()">Next Letter ➡️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+const englishData = [
+  {l:'A', w:'Apple', e:'🍎'}, {l:'B', w:'Ball', e:'⚽'}, {l:'C', w:'Cat', e:'🐱'},
+  {l:'D', w:'Dog', e:'🐶'}, {l:'E', w:'Elephant', e:'🐘'}, {l:'F', w:'Fish', e:'🐟'},
+  {l:'G', w:'Grape', e:'🍇'}, {l:'H', w:'Hat', e:'🎩'}, {l:'I', w:'Ice Cream', e:'🍦'},
+  {l:'J', w:'Juice', e:'🧃'}, {l:'K', w:'Kite', e:'🪁'}, {l:'L', w:'Lion', e:'🦁'},
+  {l:'M', w:'Moon', e:'🌙'}, {l:'N', w:'Nest', e:'🪺'}, {l:'O', w:'Orange', e:'🍊'},
+  {l:'P', w:'Pig', e:'🐷'}, {l:'Q', w:'Queen', e:'👑'}, {l:'R', w:'Rainbow', e:'🌈'},
+  {l:'S', w:'Star', e:'⭐'}, {l:'T', w:'Tiger', e:'🐯'}, {l:'U', w:'Umbrella', e:'☂️'},
+  {l:'V', w:'Violin', e:'🎻'}, {l:'W', w:'Whale', e:'🐋'}, {l:'X', w:'Xylophone', e:'🎵'},
+  {l:'Y', w:'Yarn', e:'🧶'}, {l:'Z', w:'Zebra', e:'🦓'}
+];
+
+const arabicData = [
+  {l:'أ', w:'أسد', e:'🦁'}, {l:'ب', w:'بيت', e:'🏠'}, {l:'ت', w:'تفاح', e:'🍎'},
+  {l:'ث', w:'ثعلب', e:'🦊'}, {l:'ج', w:'جمل', e:'🐪'}, {l:'ح', w:'حصان', e:'🐴'},
+  {l:'خ', w:'خروف', e:'🐑'}, {l:'د', w:'دب', e:'🐻'}, {l:'ذ', w:'ذرة', e:'🌽'},
+  {l:'ر', w:'رمان', e:'🍎'}, {l:'ز', w:'زرافة', e:'🦒'}, {l:'س', w:'سمكة', e:'🐟'},
+  {l:'ش', w:'شمس', e:'☀️'}, {l:'ص', w:'صقر', e:'🦅'}, {l:'ض', w:'ضفدع', e:'🐸'},
+  {l:'ط', w:'طاووس', e:'🦚'}, {l:'ظ', w:'ظبي', e:'🦌'}, {l:'ع', w:'عصفور', e:'🐦'},
+  {l:'غ', w:'غزال', e:'🦌'}, {l:'ف', w:'فراشة', e:'🦋'}, {l:'ق', w:'قمر', e:'🌙'},
+  {l:'ك', w:'كلب', e:'🐶'}, {l:'ل', w:'ليمون', e:'🍋'}, {l:'م', w:'موزة', e:'🍌'},
+  {l:'ن', w:'نجمة', e:'⭐'}, {l:'ه', w:'هدهد', e:'🐦'}, {l:'و', w:'وردة', e:'🌹'},
+  {l:'ي', w:'يمامة', e:'🕊️'}
+];
+
+const colors = ['#FF6B9D','#FFD93D','#4ECDC4','#A855F7','#FF8C42','#6BCB77','#4D96FF','#F9844A','#52B788','#E63946'];
+
+// ===== BACKGROUND BUBBLES =====
+function createBgBubbles() {
+  const container = document.getElementById('bgBubbles');
+  for (let i = 0; i < 8; i++) {
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    const size = Math.random() * 100 + 60;
+    b.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      left:${Math.random()*100}%;
+      animation-duration:${Math.random()*12+10}s;
+      animation-delay:${Math.random()*8}s;
+    `;
+    container.appendChild(b);
+  }
+}
+createBgBubbles();
+
+// ===== LETTER GRIDS =====
+function buildGrid(data, containerId, isArabic) {
+  const grid = document.getElementById(containerId);
+  data.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'letter-card' + (isArabic ? ' ar-card' : '');
+    const color = colors[i % colors.length];
+    card.style.borderColor = color;
+    card.style.background = `linear-gradient(135deg, white, ${color}18)`;
+    card.innerHTML = `
+      <span class="letter-big" style="color:${color}">${item.l}</span>
+      <span class="letter-emoji">${item.e}</span>
+      <span class="letter-word" style="color:${color}">${item.w}</span>
+    `;
+    card.addEventListener('click', () => {
+      card.classList.add('pop');
+      setTimeout(() => card.classList.remove('pop'), 400);
+      speak(item.l, isArabic ? 'ar' : 'en');
+      showFeedback('⭐');
+    });
+    grid.appendChild(card);
+  });
+}
+buildGrid(englishData, 'en-grid', false);
+buildGrid(arabicData, 'ar-grid', true);
+
+// ===== PANEL SWITCHING =====
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('btn-' + (name === 'english' ? 'en' : name === 'arabic' ? 'ar' : 'game')).classList.add('active');
+  if (name === 'games') initMatchGame();
+}
+
+function showGame(name) {
+  document.querySelectorAll('.game-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.game-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('game-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'bubble') startBubbleGame();
+  if (name === 'trace') initTraceGame();
+}
+
+// ===== SPEECH =====
+function speak(text, lang = 'en') {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang === 'ar' ? 'ar-SA' : 'en-US';
+  u.rate = 0.7;
+  u.pitch = 1.3;
+  window.speechSynthesis.speak(u);
+}
+
+// ===== FEEDBACK =====
+function showFeedback(emoji) {
+  const el = document.createElement('div');
+  el.className = 'feedback-stars';
+  el.textContent = emoji;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+function confetti() {
+  const confColors = ['#FF6B9D','#FFD93D','#4ECDC4','#A855F7','#FF8C42','#6BCB77'];
+  for (let i = 0; i < 50; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.cssText = `
+        left:${Math.random()*100}vw;
+        top:-20px;
+        background:${confColors[Math.floor(Math.random()*confColors.length)]};
+        border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+        animation-duration:${Math.random()*1.5+1}s;
+        transform:rotate(${Math.random()*360}deg);
+      `;
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 2500);
+    }, i * 30);
+  }
+}
+
+// ===== MATCH GAME: Letter → Object =====
+let matchScore = 0;
+let matchLang = 'en';
+let matchCorrectLetter = '';
+
+function toggleMatchLang() {
+  matchLang = matchLang === 'en' ? 'ar' : 'en';
+  const btn = document.getElementById('match-lang-btn');
+  btn.textContent = matchLang === 'en' ? '🌐 عربي' : '🌐 English';
+  initMatchGame();
+}
+
+function initMatchGame() {
+  const data = matchLang === 'en' ? englishData : arabicData;
+  const idx = Math.floor(Math.random() * data.length);
+  const item = data[idx];
+  matchCorrectLetter = item.l;
+
+  // Show the object (emoji + word)
+  document.getElementById('match-emoji').textContent = item.e;
+  document.getElementById('match-word').textContent = item.w;
+  document.getElementById('match-object-card').style.borderColor = colors[idx % colors.length];
+  document.getElementById('match-object-card').style.borderWidth = '4px';
+  document.getElementById('match-object-card').style.borderStyle = 'solid';
+
+  document.getElementById('match-question').textContent =
+    matchLang === 'en' ? 'Which letter does this start with? 🔍' : 'بأي حرف تبدأ هذه الكلمة؟ 🔍';
+
+  // Say the word aloud
+  speak(item.w, matchLang);
+
+  // Build 4 letter choices: correct + 3 wrong
+  const wrongs = [];
+  while (wrongs.length < 3) {
+    const r = data[Math.floor(Math.random() * data.length)];
+    if (r.l !== matchCorrectLetter && !wrongs.find(w => w === r.l)) wrongs.push(r.l);
+  }
+
+  const choices = [matchCorrectLetter, ...wrongs].sort(() => Math.random() - 0.5);
+  const container = document.getElementById('match-choices');
+  container.innerHTML = '';
+
+  choices.forEach(letter => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = letter;
+    const ci = data.findIndex(d => d.l === letter);
+    btn.style.color = colors[(ci >= 0 ? ci : Math.floor(Math.random()*colors.length)) % colors.length];
+    btn.style.borderColor = 'transparent';
+    btn.onclick = () => handleMatchChoice(btn, letter);
+    container.appendChild(btn);
+  });
+}
+
+function handleMatchChoice(btn, letter) {
+  const allBtns = document.querySelectorAll('.choice-btn');
+  allBtns.forEach(b => b.onclick = null);
+
+  if (letter === matchCorrectLetter) {
+    btn.classList.add('correct');
+    matchScore++;
+    document.getElementById('match-score').textContent = matchScore;
+    showFeedback('🌟');
+    confetti();
+    speak(matchLang === 'en' ? 'Yay! Great job!' : 'أحسنت! ممتاز!', matchLang);
+    setTimeout(initMatchGame, 1600);
+  } else {
+    btn.classList.add('wrong');
+    showFeedback('💪');
+    speak(matchLang === 'en' ? 'Try again!' : 'حاول مرة أخرى!', matchLang);
+    setTimeout(() => {
+      btn.classList.remove('wrong');
+      allBtns.forEach(b => b.onclick = () => handleMatchChoice(b, b.textContent));
+    }, 700);
+  }
+}
+
+// ===== BUBBLE POP GAME =====
+let bubbleScore = 0;
+let bubbleTarget = '';
+let bubbleInterval = null;
+let bubbleLang = 'en';
+
+function startBubbleGame() {
+  clearInterval(bubbleInterval);
+  document.getElementById('bubbles-container').innerHTML = '';
+  const data = englishData;
+  const idx = Math.floor(Math.random() * data.length);
+  bubbleTarget = data[idx].l;
+  document.getElementById('bubble-target').textContent = bubbleTarget;
+  speak(bubbleTarget, 'en');
+
+  bubbleInterval = setInterval(() => spawnBubble(data), 1400);
+  spawnBubble(data);
+}
+
+function spawnBubble(data) {
+  const container = document.getElementById('bubbles-container');
+  const item = data[Math.floor(Math.random() * data.length)];
+  // Weight: 40% chance it's the correct one
+  const letter = Math.random() < 0.4 ? bubbleTarget : item.l;
+  const size = Math.floor(Math.random() * 40 + 65);
+  const isTarget = letter === bubbleTarget;
+  const color = isTarget ? '#4ECDC4' : colors[Math.floor(Math.random()*colors.length)];
+
+  const bubble = document.createElement('div');
+  bubble.className = 'pop-bubble';
+  const left = Math.random() * (container.clientWidth - size - 10) + 5;
+  const duration = Math.random() * 3 + 4;
+  bubble.style.cssText = `
+    width:${size}px; height:${size}px;
+    left:${left}px; bottom: -${size}px;
+    background: radial-gradient(circle at 35% 35%, ${color}dd, ${color}88);
+    color: white;
+    font-size: ${size * 0.4}px;
+    animation-duration: ${duration}s;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  `;
+  bubble.textContent = letter;
+
+  bubble.addEventListener('click', () => {
+    if (isTarget) {
+      bubble.classList.add('popped');
+      bubbleScore++;
+      document.getElementById('bubble-score').textContent = bubbleScore;
+      showFeedback('🌟');
+      if (bubbleScore % 5 === 0) confetti();
+      speak('Pop!', 'en');
+      // Pick new target
+      setTimeout(() => {
+        const ni = Math.floor(Math.random() * data.length);
+        bubbleTarget = data[ni].l;
+        document.getElementById('bubble-target').textContent = bubbleTarget;
+        speak(bubbleTarget, 'en');
+        setTimeout(() => bubble.remove(), 400);
+      }, 300);
+    } else {
+      bubble.style.animation = 'shake 0.3s ease';
+      speak('Not this one!', 'en');
+    }
+  });
+
+  container.appendChild(bubble);
+  setTimeout(() => { if (bubble.parentNode) bubble.remove(); }, duration * 1000 + 500);
+}
+
+// ===== TRACE GAME =====
+let traceIdx = 0;
+let traceDrawing = false;
+const traceLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+function initTraceGame() {
+  const canvas = document.getElementById('traceCanvas');
+  const ctx = canvas.getContext('2d');
+  drawTraceBackground(ctx, canvas, traceLetters[traceIdx]);
+  setupCanvas(canvas, ctx);
+}
+
+function drawTraceBackground(ctx, canvas, letter) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Background
+  ctx.fillStyle = '#f8f4ff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Dotted guide letter
+  ctx.font = `bold ${canvas.height * 0.7}px 'Poppins', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(168,85,247,0.12)';
+  ctx.fillText(letter, canvas.width / 2, canvas.height / 2);
+
+  // Dotted outline
+  ctx.strokeStyle = 'rgba(168,85,247,0.35)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 8]);
+  ctx.strokeText(letter, canvas.width / 2, canvas.height / 2);
+  ctx.setLineDash([]);
+
+  document.getElementById('trace-letter').textContent = letter;
+  speak(letter, 'en');
+}
+
+function setupCanvas(canvas, ctx) {
+  ctx.strokeStyle = '#FF6B9D';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  let drawing = false;
+  let lastX, lastY;
+
+  function getPos(e, canvas) {
+    const r = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return [(src.clientX - r.left) * (canvas.width / r.width),
+            (src.clientY - r.top) * (canvas.height / r.height)];
+  }
+
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    [lastX, lastY] = getPos(e, canvas);
+  }
+  function draw(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    const [x, y] = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    [lastX, lastY] = [x, y];
+  }
+  function stop(e) { e.preventDefault(); drawing = false; }
+
+  canvas.removeEventListener('mousedown', canvas._start);
+  canvas.removeEventListener('mousemove', canvas._draw);
+  canvas.removeEventListener('mouseup', canvas._stop);
+  canvas.removeEventListener('touchstart', canvas._start);
+  canvas.removeEventListener('touchmove', canvas._draw);
+  canvas.removeEventListener('touchend', canvas._stop);
+
+  canvas._start = start; canvas._draw = draw; canvas._stop = stop;
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stop);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', draw, {passive:false});
+  canvas.addEventListener('touchend', stop, {passive:false});
+}
+
+function clearCanvas() {
+  const canvas = document.getElementById('traceCanvas');
+  const ctx = canvas.getContext('2d');
+  drawTraceBackground(ctx, canvas, traceLetters[traceIdx]);
+  setupCanvas(canvas, ctx);
+}
+
+function nextTraceLetter() {
+  traceIdx = (traceIdx + 1) % traceLetters.length;
+  const canvas = document.getElementById('traceCanvas');
+  const ctx = canvas.getContext('2d');
+  drawTraceBackground(ctx, canvas, traceLetters[traceIdx]);
+  setupCanvas(canvas, ctx);
+  showFeedback('⭐');
+}
+
+// Init
+initMatchGame();
+</script>
+</body>
+</html>
