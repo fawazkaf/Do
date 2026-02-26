@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Minds | عقول صغيرة</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&family=Scheherazade+New:wght@700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coral:#FF6B6B; --mint:#4ECDC4; --purple:#C77DFF; --orange:#FF9F43;
+  --blue:#54A0FF; --green:#5EE07B; --pink:#FF6EB4; --sky:#FFE566;
+  --bg:#FFF9F0; --shadow:0 8px 0 rgba(0,0,0,0.13);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);font-family:'Nunito',sans-serif;min-height:100vh;overflow-x:hidden;}
+.bubbles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;}
+.bubble{position:absolute;border-radius:50%;opacity:.15;animation:floatUp linear infinite;}
+@keyframes floatUp{0%{transform:translateY(110vh) scale(.8);opacity:.15}100%{transform:translateY(-20vh) scale(1.1);opacity:0}}
+header{position:relative;z-index:10;background:linear-gradient(135deg,#FF6B6B,#FF9F43,#FFE566);padding:14px 20px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.15);}
+header h1{font-family:'Fredoka One',cursive;font-size:clamp(1.8rem,5vw,3rem);color:#fff;text-shadow:3px 3px 0 rgba(0,0,0,.15);letter-spacing:2px;}
+header p{color:rgba(255,255,255,.95);font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;margin-top:2px;}
+.stars{font-size:1.2rem;letter-spacing:4px;}
+.lang-toggle{display:flex;justify-content:center;gap:10px;padding:12px;position:relative;z-index:10;}
+.lang-btn{font-family:'Fredoka One',cursive;font-size:1.1rem;padding:8px 24px;border:4px solid transparent;border-radius:50px;cursor:pointer;transition:all .2s;}
+.lang-btn.en{background:var(--blue);color:#fff;border-color:#2980d4;}
+.lang-btn.ar{background:var(--purple);color:#fff;border-color:#9b4dd6;font-family:'Scheherazade New',serif;font-size:1.2rem;}
+.lang-btn.active{transform:scale(1.1);box-shadow:0 5px 0 rgba(0,0,0,.2);}
+.lang-btn:not(.active){opacity:.55;}
+.tabs{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:0 12px 12px;position:relative;z-index:10;}
+.tab{font-family:'Fredoka One',cursive;font-size:clamp(.8rem,2.2vw,1rem);padding:8px 16px;border:none;border-radius:50px;cursor:pointer;transition:all .2s;box-shadow:0 5px 0 rgba(0,0,0,.2);}
+.tab:active,.tab.active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.2);}
+.tab[data-cat="letters"]{background:var(--coral);color:#fff;}
+.tab[data-cat="numbers"]{background:var(--blue);color:#fff;}
+.tab[data-cat="shapes"]{background:var(--mint);color:#fff;}
+.tab[data-cat="colors"]{background:var(--orange);color:#fff;}
+.tab[data-cat="animals"]{background:var(--green);color:#fff;}
+.tab[data-cat="objects"]{background:var(--pink);color:#fff;}
+.tab[data-cat="quiz"]{background:var(--purple);color:#fff;}
+main{position:relative;z-index:10;padding:8px 14px 50px;max-width:1000px;margin:0 auto;}
+.section{display:none;}.section.active{display:block;}
+/* Sub-tabs: Learn / Play */
+.subtabs{display:flex;justify-content:center;gap:10px;margin-bottom:16px;}
+.subtab{font-family:'Fredoka One',cursive;font-size:1.1rem;padding:9px 28px;border:3px solid rgba(0,0,0,.15);border-radius:50px;cursor:pointer;background:#fff;transition:all .2s;box-shadow:0 4px 0 rgba(0,0,0,.12);}
+.subtab.active{color:#fff;border-color:transparent;transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.12);}
+.learn-panel,.game-panel{display:none;}.learn-panel.active,.game-panel.active{display:block;}
+/* LEARN Cards */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;padding:4px 0;}
+.card{background:#fff;border-radius:22px;padding:14px 10px;text-align:center;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .15s;border:4px solid transparent;user-select:none;}
+.card:hover{transform:translateY(-5px) scale(1.04);box-shadow:0 14px 0 rgba(0,0,0,.1);}
+.card:active{transform:translateY(2px) scale(.97);}
+.card .em{font-size:clamp(2.2rem,7vw,3.5rem);display:block;margin-bottom:5px;line-height:1.1;}
+.card:hover .em{animation:wiggle .4s ease;}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) scale(1.15)}75%{transform:rotate(12deg) scale(1.15)}}
+.card .mtxt{font-family:'Fredoka One',cursive;font-size:clamp(1.6rem,4.5vw,2.5rem);line-height:1;margin-bottom:3px;}
+.card .stxt{font-size:clamp(.7rem,1.8vw,.9rem);font-weight:700;opacity:.7;line-height:1.2;}
+.arabic-text{font-family:'Scheherazade New',serif!important;font-weight:700;}
+.swatch{width:60px;height:60px;border-radius:50%;margin:0 auto 8px;border:5px solid rgba(0,0,0,.1);box-shadow:0 4px 12px rgba(0,0,0,.2);}
+/* ===== GAME SHARED ===== */
+.game-box{background:#fff;border-radius:28px;padding:24px 18px;box-shadow:var(--shadow);max-width:680px;margin:0 auto;text-align:center;}
+.game-title{font-family:'Fredoka One',cursive;font-size:clamp(1.3rem,4vw,1.9rem);color:#444;margin-bottom:6px;}
+.game-score{font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--purple);margin-bottom:14px;}
+.game-btn{font-family:'Fredoka One',cursive;font-size:1.2rem;padding:12px 32px;border:none;border-radius:50px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.18);transition:all .15s;margin:6px;}
+.game-btn:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.18);}
+.game-btn.green{background:var(--green);color:#fff;}
+.game-btn.coral{background:var(--coral);color:#fff;}
+.game-btn.blue{background:var(--blue);color:#fff;}
+.game-btn.orange{background:var(--orange);color:#fff;}
+.game-btn.mint{background:var(--mint);color:#fff;}
+/* ===== LETTER GAME: ABC ORDER ===== */
+.letter-targets{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:10px 0;}
+.letter-slot{width:54px;height:54px;border-radius:14px;border:3px dashed #ccc;display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:1.5rem;transition:all .2s;background:#f9f9f9;}
+.letter-slot.filled{border-style:solid;color:#fff;}
+.letter-slot.wrong-flash{animation:wrongFlash .4s;}
+@keyframes wrongFlash{0%,100%{background:#fff}50%{background:#ffcccc;border-color:var(--coral);}}
+.letter-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0;}
+.letter-choice{width:52px;height:52px;border-radius:14px;border:none;cursor:pointer;font-family:'Fredoka One',cursive;font-size:1.4rem;color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.15);transition:transform .1s;background:var(--blue);}
+.letter-choice:hover{transform:scale(1.1);}
+.letter-choice.used{opacity:.25;pointer-events:none;}
+/* ===== NUMBER GAME: Count Tap ===== */
+.count-emojis{font-size:clamp(1.8rem,5vw,2.8rem);letter-spacing:4px;line-height:1.6;min-height:80px;margin:10px 0;word-break:break-all;}
+.number-choices{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:14px;}
+.num-btn{width:70px;height:70px;border-radius:18px;border:none;cursor:pointer;font-family:'Fredoka One',cursive;font-size:2rem;color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.15);transition:all .15s;}
+.num-btn:hover{transform:scale(1.1);}
+.num-btn.correct{background:var(--green)!important;animation:bounce .4s;}
+.num-btn.wrong{background:var(--coral)!important;animation:shake .3s;}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+/* ===== SHAPE GAME: Match Shadow ===== */
+.shape-prompt{font-size:clamp(4rem,12vw,7rem);margin:10px 0;display:block;}
+.shape-choices-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;max-width:420px;margin-left:auto;margin-right:auto;}
+.shape-choice-btn{padding:16px 10px;border:4px solid #eee;border-radius:18px;background:#f7f7f7;cursor:pointer;font-size:1rem;font-weight:700;transition:all .15s;font-family:'Fredoka One',cursive;}
+.shape-choice-btn:hover{border-color:var(--mint);background:#e8fffe;}
+.shape-choice-btn .big-shape{font-size:2.5rem;display:block;}
+.shape-choice-btn.correct{background:#b8f5c8;border-color:var(--green);animation:bounce .4s;}
+.shape-choice-btn.wrong{background:#ffc9c9;border-color:var(--coral);animation:shake .3s;}
+/* ===== COLOR GAME: Paint Bucket ===== */
+.paint-question{font-family:'Fredoka One',cursive;font-size:clamp(1.2rem,3.5vw,1.7rem);margin-bottom:10px;color:#333;}
+.paint-target{width:120px;height:120px;border-radius:50%;margin:0 auto 14px;border:6px solid rgba(0,0,0,.15);box-shadow:0 6px 20px rgba(0,0,0,.15);transition:background .4s;}
+.paint-buckets{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;}
+.bucket-btn{width:64px;height:64px;border-radius:50%;border:5px solid rgba(0,0,0,.15);cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.15);transition:transform .15s;font-size:1.5rem;display:flex;align-items:center;justify-content:center;}
+.bucket-btn:hover{transform:scale(1.15);}
+.bucket-btn.correct-bucket{animation:bounce .4s;}
+.bucket-btn.wrong-bucket{animation:shake .3s;}
+/* ===== ANIMAL GAME: Memory Match ===== */
+.memory-grid{display:grid;gap:10px;justify-content:center;margin:10px auto;}
+.mem-card{width:80px;height:80px;border-radius:16px;cursor:pointer;perspective:400px;position:relative;user-select:none;}
+.mem-card-inner{position:absolute;inset:0;border-radius:16px;transition:transform .35s;transform-style:preserve-3d;}
+.mem-card.flipped .mem-card-inner,.mem-card.matched .mem-card-inner{transform:rotateY(180deg);}
+.mem-face{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;display:flex;align-items:center;justify-content:center;font-size:2.2rem;border:3px solid rgba(0,0,0,.1);}
+.mem-back{background:linear-gradient(135deg,#6c63ff,#4ecdc4);}
+.mem-front{background:#fff;transform:rotateY(180deg);}
+.mem-card.matched .mem-front{background:#d4edda;border-color:var(--green);}
+/* ===== OBJECT GAME: Find It ===== */
+.find-prompt{font-size:clamp(3rem,10vw,5rem);margin:6px 0;display:block;}
+.find-prompt-label{font-family:'Fredoka One',cursive;font-size:clamp(1.1rem,3vw,1.5rem);color:#555;}
+.find-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px;max-width:480px;margin-left:auto;margin-right:auto;}
+.find-cell{width:100%;aspect-ratio:1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:clamp(1.8rem,5vw,2.5rem);cursor:pointer;border:4px solid transparent;background:#f5f5f5;transition:all .15s;user-select:none;}
+.find-cell:hover{transform:scale(1.1);}
+.find-cell.correct-find{background:#d4edda;border-color:var(--green);animation:bounce .4s;}
+.find-cell.wrong-find{animation:shake .3s;}
+/* ===== QUIZ GAME ===== */
+.quiz-q{font-family:'Fredoka One',cursive;font-size:clamp(1.3rem,3.5vw,1.8rem);color:#333;margin-bottom:10px;min-height:50px;}
+.quiz-em{font-size:clamp(3.5rem,12vw,6rem);display:block;margin:6px auto;animation:bounce .5s ease;}
+.quiz-opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;}
+.quiz-opt{font-family:'Fredoka One',cursive;font-size:clamp(1rem,3vw,1.4rem);padding:14px;border:4px solid #eee;border-radius:18px;background:#f8f8f8;cursor:pointer;transition:all .15s;}
+.quiz-opt:hover{background:var(--sky);border-color:#f0c030;transform:scale(1.04);}
+.quiz-opt.correct{background:#b8f5c8;border-color:var(--green);animation:bounce .4s;}
+.quiz-opt.wrong{background:#ffc9c9;border-color:var(--coral);animation:shake .3s;}
+.streak-bar{display:flex;justify-content:center;gap:5px;margin:8px 0;}
+.streak-dot{width:18px;height:18px;border-radius:50%;background:#ddd;transition:background .3s;}
+.streak-dot.lit{background:var(--orange);}
+/* feedback popup */
+.feedback{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(4rem,12vw,7rem);z-index:999;pointer-events:none;animation:feedPop 1s ease forwards;}
+@keyframes feedPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.8)}}
+.section-hdr{font-family:'Fredoka One',cursive;font-size:clamp(1.3rem,4vw,2rem);text-align:center;margin-bottom:12px;color:#444;}
+</style>
+</head>
+<body>
+<div class="bubbles" id="bubbles"></div>
+
+<header>
+  <div class="stars">⭐ 🌟 ✨ 🌟 ⭐</div>
+  <h1>Little Minds 🧠 عقول صغيرة</h1>
+  <p>Learn & Play! • تعلم والعب!</p>
+</header>
+
+<div class="lang-toggle">
+  <button class="lang-btn en active" onclick="setLang('en')">🇬🇧 English</button>
+  <button class="lang-btn ar" onclick="setLang('ar')">🇸🇦 عربي</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-cat="letters" onclick="setTab('letters')">🔤 Letters</button>
+  <button class="tab" data-cat="numbers" onclick="setTab('numbers')">🔢 Numbers</button>
+  <button class="tab" data-cat="shapes" onclick="setTab('shapes')">🔷 Shapes</button>
+  <button class="tab" data-cat="colors" onclick="setTab('colors')">🎨 Colors</button>
+  <button class="tab" data-cat="animals" onclick="setTab('animals')">🐾 Animals</button>
+  <button class="tab" data-cat="objects" onclick="setTab('objects')">🧸 Objects</button>
+  <button class="tab" data-cat="quiz" onclick="setTab('quiz')">🎯 Quiz!</button>
+</div>
+
+<main>
+
+<!-- ===== LETTERS ===== -->
+<div class="section active" id="sec-letters">
+  <div class="subtabs">
+    <button class="subtab active" id="st-letters-learn" onclick="switchSubtab('letters','learn')" style="background:var(--coral);color:#fff;border-color:var(--coral);">📖 Learn</button>
+    <button class="subtab" id="st-letters-game" onclick="switchSubtab('letters','game')" style="">🎮 Play ABC!</button>
+  </div>
+  <div class="learn-panel active" id="lp-letters">
+    <div class="section-hdr" id="letters-title">🔤 The Alphabet!</div>
+    <div class="card-grid" id="letters-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-letters">
+    <div class="game-box">
+      <div class="game-title" id="lg-title">🔤 Tap letters in order!</div>
+      <div class="game-score" id="lg-score">⭐ 0</div>
+      <div class="letter-targets" id="lg-targets"></div>
+      <div class="letter-choices" id="lg-choices"></div>
+      <button class="game-btn blue" onclick="initLetterGame()">🔄 New Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== NUMBERS ===== -->
+<div class="section" id="sec-numbers">
+  <div class="subtabs">
+    <button class="subtab active" id="st-numbers-learn" onclick="switchSubtab('numbers','learn')" style="background:var(--blue);color:#fff;border-color:var(--blue);">📖 Learn</button>
+    <button class="subtab" id="st-numbers-game" onclick="switchSubtab('numbers','game')">🎮 Count!</button>
+  </div>
+  <div class="learn-panel active" id="lp-numbers">
+    <div class="section-hdr" id="numbers-title">🔢 Numbers 1–20!</div>
+    <div class="card-grid" id="numbers-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-numbers">
+    <div class="game-box">
+      <div class="game-title" id="ng-title">🔢 How many do you see?</div>
+      <div class="game-score" id="ng-score">⭐ 0</div>
+      <div class="count-emojis" id="ng-emojis"></div>
+      <div class="number-choices" id="ng-choices"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SHAPES ===== -->
+<div class="section" id="sec-shapes">
+  <div class="subtabs">
+    <button class="subtab active" id="st-shapes-learn" onclick="switchSubtab('shapes','learn')" style="background:var(--mint);color:#fff;border-color:var(--mint);">📖 Learn</button>
+    <button class="subtab" id="st-shapes-game" onclick="switchSubtab('shapes','game')">🎮 Match!</button>
+  </div>
+  <div class="learn-panel active" id="lp-shapes">
+    <div class="section-hdr" id="shapes-title">🔷 Shapes!</div>
+    <div class="card-grid" id="shapes-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-shapes">
+    <div class="game-box">
+      <div class="game-title" id="sg-title">🔷 What shape is this?</div>
+      <div class="game-score" id="sg-score">⭐ 0</div>
+      <span class="shape-prompt" id="sg-prompt"></span>
+      <div class="shape-choices-grid" id="sg-choices"></div>
+      <button class="game-btn mint" style="margin-top:14px;" onclick="initShapeGame()">🔄 New Round</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COLORS ===== -->
+<div class="section" id="sec-colors">
+  <div class="subtabs">
+    <button class="subtab active" id="st-colors-learn" onclick="switchSubtab('colors','learn')" style="background:var(--orange);color:#fff;border-color:var(--orange);">📖 Learn</button>
+    <button class="subtab" id="st-colors-game" onclick="switchSubtab('colors','game')">🎮 Paint!</button>
+  </div>
+  <div class="learn-panel active" id="lp-colors">
+    <div class="section-hdr" id="colors-title">🎨 Colors!</div>
+    <div class="card-grid" id="colors-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-colors">
+    <div class="game-box">
+      <div class="game-title" id="cg-title">🎨 Paint this color!</div>
+      <div class="game-score" id="cg-score">⭐ 0</div>
+      <div class="paint-question" id="cg-question"></div>
+      <div class="paint-target" id="cg-target"></div>
+      <div class="paint-buckets" id="cg-buckets"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ANIMALS ===== -->
+<div class="section" id="sec-animals">
+  <div class="subtabs">
+    <button class="subtab active" id="st-animals-learn" onclick="switchSubtab('animals','learn')" style="background:var(--green);color:#fff;border-color:var(--green);">📖 Learn</button>
+    <button class="subtab" id="st-animals-game" onclick="switchSubtab('animals','game')">🎮 Memory!</button>
+  </div>
+  <div class="learn-panel active" id="lp-animals">
+    <div class="section-hdr" id="animals-title">🐾 Animals!</div>
+    <div class="card-grid" id="animals-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-animals">
+    <div class="game-box">
+      <div class="game-title" id="ag-title">🐾 Memory Match!</div>
+      <div class="game-score" id="ag-score">Pairs: 0/6</div>
+      <div class="memory-grid" id="ag-grid"></div>
+      <button class="game-btn green" style="margin-top:12px;" onclick="initMemoryGame()">🔄 New Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== OBJECTS ===== -->
+<div class="section" id="sec-objects">
+  <div class="subtabs">
+    <button class="subtab active" id="st-objects-learn" onclick="switchSubtab('objects','learn')" style="background:var(--pink);color:#fff;border-color:var(--pink);">📖 Learn</button>
+    <button class="subtab" id="st-objects-game" onclick="switchSubtab('objects','game')">🎮 Find It!</button>
+  </div>
+  <div class="learn-panel active" id="lp-objects">
+    <div class="section-hdr" id="objects-title">🧸 Things Around Us!</div>
+    <div class="card-grid" id="objects-grid"></div>
+  </div>
+  <div class="game-panel" id="gp-objects">
+    <div class="game-box">
+      <div class="game-title" id="og-title">🧸 Find the object!</div>
+      <div class="game-score" id="og-score">⭐ 0</div>
+      <div class="find-prompt-label" id="og-label">Find this:</div>
+      <span class="find-prompt" id="og-prompt"></span>
+      <div class="find-grid" id="og-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== QUIZ ===== -->
+<div class="section" id="sec-quiz">
+  <div class="game-box">
+    <div class="game-title" id="qz-title">🎯 Big Quiz!</div>
+    <div class="game-score" id="qz-score">⭐ Score: 0</div>
+    <div class="streak-bar" id="qz-streak"></div>
+    <div class="quiz-q" id="qz-question">Ready?</div>
+    <span class="quiz-em" id="qz-emoji">🤔</span>
+    <div class="quiz-opts" id="qz-opts"></div>
+    <button class="game-btn blue" id="qz-next" style="display:none;margin-top:14px;" onclick="nextQuizQ()">Next ➡️</button>
+  </div>
+</div>
+
+</main>
+
+<script>
+/* ========================================================
+   DATA
+======================================================== */
+const data = {
+  letters: {
+    en:[
+      {char:'A',word:'Apple',emoji:'🍎'},{char:'B',word:'Ball',emoji:'⚽'},{char:'C',word:'Cat',emoji:'🐱'},
+      {char:'D',word:'Dog',emoji:'🐶'},{char:'E',word:'Egg',emoji:'🥚'},{char:'F',word:'Fish',emoji:'🐟'},
+      {char:'G',word:'Grapes',emoji:'🍇'},{char:'H',word:'House',emoji:'🏠'},{char:'I',word:'Ice Cream',emoji:'🍦'},
+      {char:'J',word:'Jam',emoji:'🍓'},{char:'K',word:'Kite',emoji:'🪁'},{char:'L',word:'Lion',emoji:'🦁'},
+      {char:'M',word:'Moon',emoji:'🌙'},{char:'N',word:'Nest',emoji:'🪺'},{char:'O',word:'Orange',emoji:'🍊'},
+      {char:'P',word:'Penguin',emoji:'🐧'},{char:'Q',word:'Queen',emoji:'👑'},{char:'R',word:'Rainbow',emoji:'🌈'},
+      {char:'S',word:'Sun',emoji:'☀️'},{char:'T',word:'Tree',emoji:'🌳'},{char:'U',word:'Umbrella',emoji:'☂️'},
+      {char:'V',word:'Violin',emoji:'🎻'},{char:'W',word:'Watermelon',emoji:'🍉'},{char:'X',word:'Xylophone',emoji:'🎵'},
+      {char:'Y',word:'Yo-yo',emoji:'🪀'},{char:'Z',word:'Zebra',emoji:'🦓'}
+    ],
+    ar:[
+      {char:'ا',word:'أسد',emoji:'🦁'},{char:'ب',word:'بطة',emoji:'🦆'},{char:'ت',word:'تفاحة',emoji:'🍎'},
+      {char:'ث',word:'ثعلب',emoji:'🦊'},{char:'ج',word:'جمل',emoji:'🐪'},{char:'ح',word:'حصان',emoji:'🐴'},
+      {char:'خ',word:'خروف',emoji:'🐑'},{char:'د',word:'دب',emoji:'🐻'},{char:'ذ',word:'ذئب',emoji:'🐺'},
+      {char:'ر',word:'ربابة',emoji:'🎻'},{char:'ز',word:'زهرة',emoji:'🌸'},{char:'س',word:'سمكة',emoji:'🐟'},
+      {char:'ش',word:'شمس',emoji:'☀️'},{char:'ص',word:'صقر',emoji:'🦅'},{char:'ض',word:'ضفدع',emoji:'🐸'},
+      {char:'ط',word:'طائر',emoji:'🐦'},{char:'ظ',word:'ظبي',emoji:'🦌'},{char:'ع',word:'عصفور',emoji:'🐤'},
+      {char:'غ',word:'غيمة',emoji:'☁️'},{char:'ف',word:'فيل',emoji:'🐘'},{char:'ق',word:'قطة',emoji:'🐱'},
+      {char:'ك',word:'كلب',emoji:'🐶'},{char:'ل',word:'ليمون',emoji:'🍋'},{char:'م',word:'موز',emoji:'🍌'},
+      {char:'ن',word:'نجمة',emoji:'⭐'},{char:'ه',word:'هلال',emoji:'🌙'},{char:'و',word:'وردة',emoji:'🌹'},
+      {char:'ي',word:'يمامة',emoji:'🕊️'}
+    ]
+  },
+  numbers:{
+    en:[
+      {n:1,w:'One'},{n:2,w:'Two'},{n:3,w:'Three'},{n:4,w:'Four'},{n:5,w:'Five'},
+      {n:6,w:'Six'},{n:7,w:'Seven'},{n:8,w:'Eight'},{n:9,w:'Nine'},{n:10,w:'Ten'},
+      {n:11,w:'Eleven'},{n:12,w:'Twelve'},{n:13,w:'Thirteen'},{n:14,w:'Fourteen'},{n:15,w:'Fifteen'}
+    ],
+    ar:[
+      {n:1,w:'واحد'},{n:2,w:'اثنان'},{n:3,w:'ثلاثة'},{n:4,w:'أربعة'},{n:5,w:'خمسة'},
+      {n:6,w:'ستة'},{n:7,w:'سبعة'},{n:8,w:'ثمانية'},{n:9,w:'تسعة'},{n:10,w:'عشرة'},
+      {n:11,w:'أحد عشر'},{n:12,w:'اثنا عشر'},{n:13,w:'ثلاثة عشر'},{n:14,w:'أربعة عشر'},{n:15,w:'خمسة عشر'}
+    ],
+    emoji:['🍎','🐶','⭐','🌸','🎈','🍕','🦋','🍦','🐱','🐸','🍓','⚽','🎵','🌻','🎀']
+  },
+  shapes:[
+    {name:'Circle',ar:'دائرة',emoji:'⭕'},{name:'Square',ar:'مربع',emoji:'⬛'},
+    {name:'Triangle',ar:'مثلث',emoji:'🔺'},{name:'Star',ar:'نجمة',emoji:'⭐'},
+    {name:'Heart',ar:'قلب',emoji:'❤️'},{name:'Diamond',ar:'معين',emoji:'🔷'},
+    {name:'Rectangle',ar:'مستطيل',emoji:'▬'},{name:'Oval',ar:'بيضاوي',emoji:'🥚'},
+    {name:'Crescent',ar:'هلال',emoji:'🌙'},{name:'Pentagon',ar:'خماسي',emoji:'🔵'}
+  ],
+  colors:[
+    {name:'Red',ar:'أحمر',hex:'#FF4444'},{name:'Blue',ar:'أزرق',hex:'#4488FF'},
+    {name:'Yellow',ar:'أصفر',hex:'#FFD700'},{name:'Green',ar:'أخضر',hex:'#44CC55'},
+    {name:'Orange',ar:'برتقالي',hex:'#FF8C00'},{name:'Purple',ar:'بنفسجي',hex:'#9B59B6'},
+    {name:'Pink',ar:'وردي',hex:'#FF69B4'},{name:'Brown',ar:'بني',hex:'#8B4513'},
+    {name:'White',ar:'أبيض',hex:'#F5F5F5'},{name:'Black',ar:'أسود',hex:'#333333'},
+    {name:'Gray',ar:'رمادي',hex:'#999'},{name:'Turquoise',ar:'فيروزي',hex:'#40E0D0'}
+  ],
+  animals:[
+    {name:'Dog',ar:'كلب',emoji:'🐶'},{name:'Cat',ar:'قطة',emoji:'🐱'},{name:'Lion',ar:'أسد',emoji:'🦁'},
+    {name:'Elephant',ar:'فيل',emoji:'🐘'},{name:'Monkey',ar:'قرد',emoji:'🐵'},{name:'Rabbit',ar:'أرنب',emoji:'🐰'},
+    {name:'Bear',ar:'دب',emoji:'🐻'},{name:'Giraffe',ar:'زرافة',emoji:'🦒'},{name:'Zebra',ar:'حمار وحشي',emoji:'🦓'},
+    {name:'Tiger',ar:'نمر',emoji:'🐯'},{name:'Frog',ar:'ضفدع',emoji:'🐸'},{name:'Fish',ar:'سمكة',emoji:'🐟'},
+    {name:'Bird',ar:'طائر',emoji:'🐦'},{name:'Duck',ar:'بطة',emoji:'🦆'},{name:'Horse',ar:'حصان',emoji:'🐴'},
+    {name:'Cow',ar:'بقرة',emoji:'🐮'},{name:'Sheep',ar:'خروف',emoji:'🐑'},{name:'Penguin',ar:'بطريق',emoji:'🐧'},
+    {name:'Fox',ar:'ثعلب',emoji:'🦊'},{name:'Butterfly',ar:'فراشة',emoji:'🦋'}
+  ],
+  objects:[
+    {name:'Ball',ar:'كرة',emoji:'⚽'},{name:'Book',ar:'كتاب',emoji:'📚'},{name:'Car',ar:'سيارة',emoji:'🚗'},
+    {name:'House',ar:'منزل',emoji:'🏠'},{name:'Sun',ar:'شمس',emoji:'☀️'},{name:'Moon',ar:'قمر',emoji:'🌙'},
+    {name:'Star',ar:'نجمة',emoji:'⭐'},{name:'Flower',ar:'زهرة',emoji:'🌸'},{name:'Tree',ar:'شجرة',emoji:'🌳'},
+    {name:'Apple',ar:'تفاحة',emoji:'🍎'},{name:'Banana',ar:'موزة',emoji:'🍌'},{name:'Milk',ar:'حليب',emoji:'🥛'},
+    {name:'Bread',ar:'خبز',emoji:'🍞'},{name:'Pencil',ar:'قلم',emoji:'✏️'},{name:'Scissors',ar:'مقص',emoji:'✂️'},
+    {name:'Airplane',ar:'طائرة',emoji:'✈️'},{name:'Boat',ar:'قارب',emoji:'⛵'},{name:'Train',ar:'قطار',emoji:'🚂'},
+    {name:'Clock',ar:'ساعة',emoji:'⏰'},{name:'Umbrella',ar:'مظلة',emoji:'☂️'},{name:'Chair',ar:'كرسي',emoji:'🪑'},
+    {name:'Bed',ar:'سرير',emoji:'🛏️'},{name:'Phone',ar:'هاتف',emoji:'📱'},{name:'Cake',ar:'كعكة',emoji:'🎂'}
+  ]
+};
+
+/* ========================================================
+   STATE
+======================================================== */
+let lang = 'en';
+let currentTab = 'letters';
+const cardColors = ['var(--coral)','var(--blue)','var(--mint)','var(--purple)','var(--orange)','var(--green)','var(--pink)','#FFD700'];
+
+/* ========================================================
+   UTILS
+======================================================== */
+function shuffle(a){return a.slice().sort(()=>Math.random()-.5);}
+function rnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function isAr(){return lang==='ar';}
+
+function speak(text,ar){
+  if(!window.speechSynthesis)return;
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=ar?'ar-SA':'en-US';u.rate=.85;
+  speechSynthesis.cancel();speechSynthesis.speak(u);
+}
+
+function pop(emoji){
+  const el=document.createElement('div');
+  el.className='feedback';el.textContent=emoji;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+
+/* ========================================================
+   BUBBLES
+======================================================== */
+(function(){
+  const c=['#FF6B6B','#4ECDC4','#FFE566','#C77DFF','#54A0FF','#5EE07B','#FF9F43'];
+  const b=document.getElementById('bubbles');
+  for(let i=0;i<14;i++){
+    const d=document.createElement('div');d.className='bubble';
+    const s=40+Math.random()*90;
+    d.style.cssText=`width:${s}px;height:${s}px;background:${c[i%c.length]};left:${Math.random()*100}%;animation-duration:${8+Math.random()*12}s;animation-delay:${Math.random()*10}s;`;
+    b.appendChild(d);
+  }
+})();
+
+/* ========================================================
+   LEARN RENDERS
+======================================================== */
+function renderLetters(){
+  const items=data.letters[lang];
+  document.getElementById('letters-title').textContent=isAr()?'🔤 الحروف الأبجدية!':'🔤 The Alphabet!';
+  document.getElementById('letters-grid').innerHTML=items.map((it,i)=>`
+    <div class="card" style="border-color:${cardColors[i%8]};background:${cardColors[i%8].replace('var(--','').replace(')','')+'11'}"
+         onclick="speak('${it.char}. ${it.word}',${isAr()});pop('${it.emoji}');">
+      <span class="em">${it.emoji}</span>
+      <div class="mtxt ${isAr()?'arabic-text':''}">${it.char}</div>
+      <div class="stxt ${isAr()?'arabic-text':''}">${it.word}</div>
+    </div>`).join('');
+}
+function renderNumbers(){
+  const items=data.numbers[lang];
+  document.getElementById('numbers-title').textContent=isAr()?'🔢 الأرقام!':'🔢 Numbers 1–15!';
+  document.getElementById('numbers-grid').innerHTML=items.map((it,i)=>`
+    <div class="card" style="border-color:${cardColors[i%8]};"
+         onclick="speak('${it.w}',${isAr()});pop('${'⭐'.repeat(Math.min(it.n,5))}');">
+      <span class="em">${'●'.repeat(Math.min(it.n,10))}</span>
+      <div class="mtxt">${it.n}</div>
+      <div class="stxt ${isAr()?'arabic-text':''}">${it.w}</div>
+    </div>`).join('');
+}
+function renderShapes(){
+  document.getElementById('shapes-title').textContent=isAr()?'🔷 الأشكال!':'🔷 Shapes!';
+  document.getElementById('shapes-grid').innerHTML=data.shapes.map((it,i)=>`
+    <div class="card" style="border-color:${cardColors[i%8]};"
+         onclick="speak('${isAr()?it.ar:it.name}',${isAr()});pop('${it.emoji}');">
+      <span class="em">${it.emoji}</span>
+      <div class="stxt ${isAr()?'arabic-text':''}" style="font-size:1rem;font-weight:900;">${isAr()?it.ar:it.name}</div>
+    </div>`).join('');
+}
+function renderColors(){
+  document.getElementById('colors-title').textContent=isAr()?'🎨 الألوان!':'🎨 Colors!';
+  document.getElementById('colors-grid').innerHTML=data.colors.map((it,i)=>`
+    <div class="card" style="border-color:${it.hex};"
+         onclick="speak('${isAr()?it.ar:it.name}',${isAr()});pop('🎨');">
+      <div class="swatch" style="background:${it.hex};"></div>
+      <div class="stxt ${isAr()?'arabic-text':''}" style="font-size:1rem;font-weight:900;">${isAr()?it.ar:it.name}</div>
+    </div>`).join('');
+}
+function renderAnimals(){
+  document.getElementById('animals-title').textContent=isAr()?'🐾 الحيوانات!':'🐾 Animals!';
+  document.getElementById('animals-grid').innerHTML=data.animals.map((it,i)=>`
+    <div class="card" style="border-color:${cardColors[i%8]};"
+         onclick="speak('${isAr()?it.ar:it.name}',${isAr()});pop('${it.emoji}');">
+      <span class="em">${it.emoji}</span>
+      <div class="stxt ${isAr()?'arabic-text':''}" style="font-size:1rem;font-weight:900;">${isAr()?it.ar:it.name}</div>
+    </div>`).join('');
+}
+function renderObjects(){
+  document.getElementById('objects-title').textContent=isAr()?'🧸 الأشياء حولنا!':'🧸 Things Around Us!';
+  document.getElementById('objects-grid').innerHTML=data.objects.map((it,i)=>`
+    <div class="card" style="border-color:${cardColors[i%8]};"
+         onclick="speak('${isAr()?it.ar:it.name}',${isAr()});pop('${it.emoji}');">
+      <span class="em">${it.emoji}</span>
+      <div class="stxt ${isAr()?'arabic-text':''}" style="font-size:1rem;font-weight:900;">${isAr()?it.ar:it.name}</div>
+    </div>`).join('');
+}
+
+/* ========================================================
+   GAME 1: LETTER ORDER (tap letters A→B→C in sequence)
+======================================================== */
+let lgState={seq:[],next:0,score:0};
+function initLetterGame(){
+  const letters=data.letters[lang];
+  const pool=shuffle(letters).slice(0,isAr()?6:6);
+  pool.sort((a,b)=>{
+    const all=data.letters[lang];
+    return all.indexOf(a)-all.indexOf(b);
+  });
+  lgState={seq:pool,next:0,score:lgState.score};
+  const tEl=document.getElementById('lg-targets');
+  const cEl=document.getElementById('lg-choices');
+  tEl.innerHTML=pool.map((_,i)=>`<div class="letter-slot" id="lslot-${i}" style="border-color:${cardColors[i%8]};"></div>`).join('');
+  const choices=shuffle(pool);
+  cEl.innerHTML=choices.map((it,i)=>`
+    <button class="letter-choice" id="lch-${it.char}" style="background:${cardColors[i%8]};"
+      onclick="tapLetter('${it.char}')">${it.char}</button>`).join('');
+  document.getElementById('lg-title').textContent=isAr()?'اضغط الحروف بالترتيب!':'Tap letters in order! A → B → C...';
+  updateLgScore();
+}
+function tapLetter(ch){
+  const expected=lgState.seq[lgState.next];
+  if(ch===expected.char){
+    const slot=document.getElementById(`lslot-${lgState.next}`);
+    const btn=document.getElementById(`lch-${ch}`);
+    slot.textContent=ch;
+    slot.style.background=cardColors[lgState.next%8];
+    slot.style.borderStyle='solid';
+    btn.classList.add('used');
+    speak(ch+'. '+expected.word,isAr());
+    lgState.next++;
+    if(lgState.next===lgState.seq.length){
+      lgState.score++;updateLgScore();
+      pop('🎉');setTimeout(()=>{speak(isAr()?'رائع!':'Amazing!',isAr());initLetterGame();},1200);
+    }
+  } else {
+    const slot=document.getElementById(`lslot-${lgState.next}`);
+    slot.classList.add('wrong-flash');
+    setTimeout(()=>slot.classList.remove('wrong-flash'),400);
+    pop('💪');speak(isAr()?'حاول مرة أخرى!':'Try again!',isAr());
+  }
+}
+function updateLgScore(){document.getElementById('lg-score').textContent=`⭐ ${lgState.score}`;}
+
+/* ========================================================
+   GAME 2: COUNT EMOJIS
+======================================================== */
+let ngState={answer:0,score:0,answered:false};
+function initCountGame(){
+  ngState.answered=false;
+  const n=1+Math.floor(Math.random()*10);
+  ngState.answer=n;
+  const emoji=rnd(data.numbers.emoji);
+  document.getElementById('ng-emojis').textContent=emoji.repeat(n);
+  document.getElementById('ng-title').textContent=isAr()?'كم عدد هذه الأشياء؟':'How many do you see?';
+  // 4 buttons: correct + 3 distractors
+  let opts=[n];
+  while(opts.length<4){
+    const d=1+Math.floor(Math.random()*10);
+    if(!opts.includes(d))opts.push(d);
+  }
+  opts=shuffle(opts);
+  const colors=['#FF6B6B','#54A0FF','#5EE07B','#FF9F43'];
+  document.getElementById('ng-choices').innerHTML=opts.map((o,i)=>`
+    <button class="num-btn" style="background:${colors[i]};" onclick="checkCount(this,${o})">${o}</button>`).join('');
+}
+function checkCount(el,val){
+  if(ngState.answered)return;
+  ngState.answered=true;
+  if(val===ngState.answer){
+    el.classList.add('correct');ngState.score++;
+    document.getElementById('ng-score').textContent=`⭐ ${ngState.score}`;
+    pop('🎉');speak(isAr()?'أحسنت! '+data.numbers.ar[val-1].w:'Great! '+data.numbers.en[val-1].w,isAr());
+    setTimeout(initCountGame,1200);
+  } else {
+    el.classList.add('wrong');pop('💪');
+    setTimeout(initCountGame,900);
+  }
+}
+
+/* ========================================================
+   GAME 3: SHAPE MATCH
+======================================================== */
+let sgState={correct:null,score:0,answered:false};
+function initShapeGame(){
+  sgState.answered=false;
+  const shapes=shuffle(data.shapes);
+  sgState.correct=shapes[0];
+  document.getElementById('sg-prompt').textContent=sgState.correct.emoji;
+  // 6 options
+  const opts=shuffle(shapes.slice(0,6));
+  const colors=['#FF6B6B','#54A0FF','#5EE07B','#FF9F43','#C77DFF','#FF6EB4'];
+  document.getElementById('sg-choices').innerHTML=opts.map((s,i)=>`
+    <button class="shape-choice-btn" style="border-color:${colors[i%6]};"
+      onclick="checkShape(this,'${s.name}')">
+      <span class="big-shape">${s.emoji}</span>
+      <span class="${isAr()?'arabic-text':''}" style="font-size:.9rem;">${isAr()?s.ar:s.name}</span>
+    </button>`).join('');
+  speak((isAr()?'ما هذا الشكل؟':'What shape is this?'),isAr());
+}
+function checkShape(el,name){
+  if(sgState.answered)return;
+  sgState.answered=true;
+  if(name===sgState.correct.name){
+    el.classList.add('correct');sgState.score++;
+    document.getElementById('sg-score').textContent=`⭐ ${sgState.score}`;
+    pop('🎉');speak(isAr()?sgState.correct.ar:name,isAr());
+    setTimeout(initShapeGame,1200);
+  } else {
+    el.classList.add('wrong');pop('💪');
+    setTimeout(()=>{el.classList.remove('wrong');sgState.answered=false;},500);
+  }
+}
+
+/* ========================================================
+   GAME 4: PAINT BUCKET (tap the correct color bucket)
+======================================================== */
+let cgState={correct:null,score:0};
+function initColorGame(){
+  const all=shuffle(data.colors);
+  cgState.correct=all[0];
+  const opts=all.slice(0,8);// show 8 buckets
+  document.getElementById('cg-question').textContent=
+    isAr()?`اختر اللون: ${cgState.correct.ar}`:`Choose: ${cgState.correct.name}`;
+  document.getElementById('cg-target').style.background='#eee';
+  document.getElementById('cg-buckets').innerHTML=opts.map(c=>`
+    <button class="bucket-btn" style="background:${c.hex};"
+      onclick="checkColor(this,'${c.name}','${c.hex}')">🪣</button>`).join('');
+  speak((isAr()?'أين اللون ':'')+cgState.correct.ar+(isAr()?'':cgState.correct.name),isAr());
+}
+function checkColor(el,name,hex){
+  if(name===cgState.correct.name){
+    document.getElementById('cg-target').style.background=hex;
+    el.classList.add('correct-bucket');cgState.score++;
+    document.getElementById('cg-score').textContent=`⭐ ${cgState.score}`;
+    pop('🎨');speak(isAr()?cgState.correct.ar:name,isAr());
+    setTimeout(initColorGame,1200);
+  } else {
+    el.classList.add('wrong-bucket');
+    setTimeout(()=>el.classList.remove('wrong-bucket'),400);
+    pop('💪');
+  }
+}
+
+/* ========================================================
+   GAME 5: MEMORY MATCH (animals)
+======================================================== */
+let memState={cards:[],flipped:[],matched:0,locked:false};
+function initMemoryGame(){
+  const picked=shuffle(data.animals).slice(0,6);
+  const pairs=shuffle([...picked,...picked].map((a,i)=>({...a,id:i,pairKey:a.name})));
+  memState={cards:pairs,flipped:[],matched:0,locked:false};
+  const cols=Math.min(4,pairs.length);
+  const grid=document.getElementById('ag-grid');
+  grid.style.gridTemplateColumns=`repeat(${cols},80px)`;
+  grid.innerHTML=pairs.map((c,i)=>`
+    <div class="mem-card" id="mc-${i}" onclick="flipCard(${i})">
+      <div class="mem-card-inner">
+        <div class="mem-face mem-back">❓</div>
+        <div class="mem-face mem-front">${c.emoji}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('ag-score').textContent=isAr()?'الأزواج: 0/6':'Pairs: 0/6';
+  document.getElementById('ag-title').textContent=isAr()?'🐾 مطابقة الذاكرة! اقلب الأزواج!':'🐾 Memory Match! Find the pairs!';
+}
+function flipCard(idx){
+  if(memState.locked)return;
+  const card=memState.cards[idx];
+  const el=document.getElementById(`mc-${idx}`);
+  if(el.classList.contains('flipped')||el.classList.contains('matched'))return;
+  el.classList.add('flipped');
+  memState.flipped.push(idx);
+  speak(isAr()?card.ar:card.name,isAr());
+  if(memState.flipped.length===2){
+    memState.locked=true;
+    const [a,b]=memState.flipped;
+    if(memState.cards[a].pairKey===memState.cards[b].pairKey){
+      document.getElementById(`mc-${a}`).classList.add('matched');
+      document.getElementById(`mc-${b}`).classList.add('matched');
+      memState.matched++;
+      document.getElementById('ag-score').textContent=isAr()?`الأزواج: ${memState.matched}/6`:`Pairs: ${memState.matched}/6`;
+      if(memState.matched===6){pop('🎉');speak(isAr()?'ممتاز! أكملت اللعبة!':'Amazing! You finished!',isAr());}
+      memState.flipped=[];memState.locked=false;
+    } else {
+      setTimeout(()=>{
+        document.getElementById(`mc-${a}`).classList.remove('flipped');
+        document.getElementById(`mc-${b}`).classList.remove('flipped');
+        memState.flipped=[];memState.locked=false;
+      },900);
+    }
+  }
+}
+
+/* ========================================================
+   GAME 6: FIND THE OBJECT
+======================================================== */
+let ogState={target:null,score:0,answered:false};
+function initFindGame(){
+  ogState.answered=false;
+  const all=shuffle(data.objects);
+  ogState.target=all[0];
+  // 10 random cells including the target
+  const pool=shuffle(data.objects).slice(0,9);
+  if(!pool.find(o=>o.name===ogState.target.name))pool[0]=ogState.target;
+  const grid=shuffle(pool);
+  document.getElementById('og-prompt').textContent=ogState.target.emoji;
+  document.getElementById('og-label').textContent=isAr()?`ابحث عن: ${ogState.target.ar}`:`Find: ${ogState.target.name}`;
+  document.getElementById('og-grid').innerHTML=grid.map(o=>`
+    <div class="find-cell" onclick="checkFind(this,'${o.name}')">${o.emoji}</div>`).join('');
+  speak((isAr()?'ابحث عن ':'')+( isAr()?ogState.target.ar:ogState.target.name),isAr());
+}
+function checkFind(el,name){
+  if(ogState.answered)return;
+  if(name===ogState.target.name){
+    ogState.answered=true;
+    el.classList.add('correct-find');ogState.score++;
+    document.getElementById('og-score').textContent=`⭐ ${ogState.score}`;
+    pop('🎉');speak(isAr()?'وجدته! '+ogState.target.ar:'Found it! '+ogState.target.name,isAr());
+    setTimeout(initFindGame,1200);
+  } else {
+    el.classList.add('wrong-find');
+    setTimeout(()=>el.classList.remove('wrong-find'),400);
+  }
+}
+
+/* ========================================================
+   QUIZ (mega mixed)
+======================================================== */
+let qzState={score:0,streak:0,answered:false};
+function buildQuizPool(){
+  const ar=isAr();let pool=[];
+  data.animals.forEach(a=>pool.push({q:ar?'ما هذا الحيوان؟':'What animal is this?',em:a.emoji,ans:ar?a.ar:a.name,pool:'animals'}));
+  data.objects.forEach(o=>pool.push({q:ar?'ما هذا الشيء؟':'What is this?',em:o.emoji,ans:ar?o.ar:o.name,pool:'objects'}));
+  data.shapes.forEach(s=>pool.push({q:ar?'ما هذا الشكل؟':'What shape is this?',em:s.emoji,ans:ar?s.ar:s.name,pool:'shapes'}));
+  data.colors.forEach(c=>pool.push({q:ar?'ما اللون؟':'What color is this?',em:'🎨',colorHex:c.hex,ans:ar?c.ar:c.name,pool:'colors'}));
+  data.numbers[lang].forEach((n,i)=>pool.push({q:ar?'كم عدد هذه الأشياء؟':'Count the emojis! How many?',em:data.numbers.emoji[i%15].repeat(n.n),ans:String(n.n),pool:'numbers'}));
+  return pool;
+}
+let qzPool=[];let qzCurrent=null;
+function nextQuizQ(){
+  qzState.answered=false;
+  document.getElementById('qz-next').style.display='none';
+  if(!qzPool.length)qzPool=shuffle(buildQuizPool());
+  qzCurrent=qzPool.pop();
+  document.getElementById('qz-question').textContent=qzCurrent.q;
+  const emEl=document.getElementById('qz-emoji');
+  emEl.style.animation='none';void emEl.offsetWidth;
+  emEl.style.animation='bounce .5s ease';
+  if(qzCurrent.pool==='colors'){
+    emEl.textContent='';
+    emEl.style.cssText=`width:100px;height:100px;border-radius:50%;background:${qzCurrent.colorHex};border:5px solid rgba(0,0,0,.15);display:inline-block;animation:bounce .5s ease;`;
+  } else {
+    emEl.style.cssText='font-size:clamp(3.5rem,12vw,6rem);display:block;margin:6px auto;animation:bounce .5s ease;';
+    emEl.textContent=qzCurrent.em;
+  }
+  // wrong answers from same pool
+  let poolArr=buildQuizPool().filter(p=>p.pool===qzCurrent.pool&&p.ans!==qzCurrent.ans).map(p=>p.ans);
+  poolArr=shuffle([...new Set(poolArr)]).slice(0,3);
+  const opts=shuffle([qzCurrent.ans,...poolArr]);
+  document.getElementById('qz-opts').innerHTML=opts.map(o=>`
+    <button class="quiz-opt ${isAr()?'arabic-text':''}" onclick="checkQuiz(this,'${o.replace(/'/g,"\\'")}')">
+      ${qzCurrent.pool==='colors'?'<span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:'+(data.colors.find(c=>(isAr()?c.ar:c.name)===o)||{}).hex+';vertical-align:middle;margin-right:6px;border:2px solid rgba(0,0,0,.15);"></span>':''}${o}
+    </button>`).join('');
+  // Streak dots
+  const streakBar=document.getElementById('qz-streak');
+  streakBar.innerHTML=Array(5).fill(0).map((_,i)=>`<div class="streak-dot ${i<qzState.streak?'lit':''}"></div>`).join('');
+  speak(qzCurrent.q,isAr());
+}
+function checkQuiz(el,ans){
+  if(qzState.answered)return;
+  qzState.answered=true;
+  const correct=ans===qzCurrent.ans;
+  el.classList.add(correct?'correct':'wrong');
+  if(!correct){
+    document.querySelectorAll('.quiz-opt').forEach(b=>{
+      if(b.textContent.trim().includes(qzCurrent.ans))b.classList.add('correct');
+    });
+    qzState.streak=0;
+  } else {
+    qzState.score++;qzState.streak=Math.min(qzState.streak+1,5);
+  }
+  document.getElementById('qz-score').textContent=`⭐ ${isAr()?'النقاط':'Score'}: ${qzState.score}`;
+  document.getElementById('qz-next').style.display='inline-block';
+  document.getElementById('qz-next').textContent=isAr()?'التالي ➡️':'Next ➡️';
+  if(correct){pop('🎉');speak(isAr()?'أحسنت!':'Great job!',isAr());}
+  else{pop('💪');speak((isAr()?'الجواب: ':'')+qzCurrent.ans,isAr());}
+  // Update streak dots
+  const streakBar=document.getElementById('qz-streak');
+  streakBar.innerHTML=Array(5).fill(0).map((_,i)=>`<div class="streak-dot ${i<qzState.streak?'lit':''}"></div>`).join('');
+  if(qzState.streak===5){pop('🔥');qzState.streak=0;}
+}
+
+/* ========================================================
+   NAV
+======================================================== */
+function switchSubtab(cat,panel){
+  document.getElementById(`lp-${cat}`).classList.toggle('active',panel==='learn');
+  document.getElementById(`gp-${cat}`).classList.toggle('active',panel==='game');
+  document.getElementById(`st-${cat}-learn`).classList.toggle('active',panel==='learn');
+  document.getElementById(`st-${cat}-game`).classList.toggle('active',panel==='game');
+  const colors={letters:'var(--coral)',numbers:'var(--blue)',shapes:'var(--mint)',colors:'var(--orange)',animals:'var(--green)',objects:'var(--pink)'};
+  const activeBtn=document.getElementById(`st-${cat}-${panel}`);
+  activeBtn.style.background=colors[cat];activeBtn.style.color='#fff';activeBtn.style.borderColor='transparent';
+  const otherPanel=panel==='learn'?'game':'learn';
+  const otherBtn=document.getElementById(`st-${cat}-${otherPanel}`);
+  otherBtn.style.background='#fff';otherBtn.style.color='#444';otherBtn.style.borderColor='rgba(0,0,0,.15)';
+  if(panel==='game'){
+    if(cat==='letters')initLetterGame();
+    else if(cat==='numbers')initCountGame();
+    else if(cat==='shapes')initShapeGame();
+    else if(cat==='colors')initColorGame();
+    else if(cat==='animals')initMemoryGame();
+    else if(cat==='objects')initFindGame();
+  }
+}
+
+function setTab(cat){
+  currentTab=cat;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.cat===cat));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+cat).classList.add('active');
+  if(cat==='quiz'){qzState={score:0,streak:0,answered:false};qzPool=[];nextQuizQ();}
+}
+
+function setLang(l){
+  lang=l;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.classList.contains(l)));
+  renderAll();updateTabLabels();
+  qzPool=[];
+  if(currentTab==='quiz'){qzState={score:0,streak:0,answered:false};nextQuizQ();}
+}
+
+function updateTabLabels(){
+  const ar=isAr();
+  const labels=ar
+    ?['🔤 الحروف','🔢 الأرقام','🔷 الأشكال','🎨 الألوان','🐾 الحيوانات','🧸 الأشياء','🎯 اختبار']
+    :['🔤 Letters','🔢 Numbers','🔷 Shapes','🎨 Colors','🐾 Animals','🧸 Objects','🎯 Quiz!'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.textContent=labels[i]);
+}
+
+function renderAll(){
+  renderLetters();renderNumbers();renderShapes();renderColors();renderAnimals();renderObjects();
+}
+
+renderAll();
+</script>
+</body>
+</html>
