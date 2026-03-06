@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLAPPY HELL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 400px;
+    height: 600px;
+  }
+
+  canvas {
+    display: block;
+    border: 1px solid #ff003c;
+    box-shadow: 0 0 30px #ff003c, 0 0 60px #ff003c44, inset 0 0 30px #00000088;
+    image-rendering: pixelated;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.88);
+    z-index: 10;
+    gap: 16px;
+  }
+
+  #overlay.hidden { display: none; }
+
+  .overlay-title {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 52px;
+    color: #ff003c;
+    text-shadow: 0 0 20px #ff003c, 0 0 40px #ff003c, 0 0 80px #ff003c88;
+    letter-spacing: 4px;
+    animation: flicker 3s infinite;
+    line-height: 1;
+  }
+
+  .overlay-sub {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: #ff003c88;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+
+  .score-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    color: #00ffcc;
+    text-shadow: 0 0 15px #00ffcc;
+    letter-spacing: 2px;
+  }
+
+  .best-display {
+    font-size: 13px;
+    color: #ffffff66;
+    letter-spacing: 3px;
+  }
+
+  .start-btn {
+    margin-top: 10px;
+    padding: 14px 40px;
+    background: transparent;
+    border: 2px solid #ff003c;
+    color: #ff003c;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .start-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #ff003c;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s;
+    z-index: -1;
+  }
+
+  .start-btn:hover { color: #000; box-shadow: 0 0 20px #ff003c; }
+  .start-btn:hover::before { transform: scaleX(1); }
+
+  .hint {
+    font-size: 11px;
+    color: #ffffff33;
+    letter-spacing: 2px;
+  }
+
+  .difficulty-badge {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: #ff003c;
+    border: 1px solid #ff003c44;
+    padding: 4px 12px;
+    letter-spacing: 3px;
+    background: #ff003c11;
+  }
+
+  @keyframes flicker {
+    0%,19%,21%,23%,25%,54%,56%,100% { opacity:1; }
+    20%,24%,55% { opacity:0.4; }
+  }
+
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 18px;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  #score-hud {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 10px #fff, 0 0 20px #ffffff88;
+    line-height: 1;
+  }
+
+  #best-hud {
+    font-size: 11px;
+    color: #ffffff55;
+    letter-spacing: 2px;
+    text-align: right;
+  }
+
+  #level-hud {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: #ff003c;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px #ff003c;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <canvas id="c" width="400" height="600"></canvas>
+
+  <div id="hud">
+    <div>
+      <div id="score-hud">0</div>
+      <div id="level-hud">LVL 1</div>
+    </div>
+    <div id="best-hud">BEST<br><span id="best-val">0</span></div>
+  </div>
+
+  <div id="overlay">
+    <div class="overlay-title">FLAPPY<br>HELL</div>
+    <div class="overlay-sub">GOOD LUCK</div>
+    <div class="difficulty-badge">\u26a0 EXTREME DIFFICULTY</div>
+    <div id="death-score" class="score-display" style="display:none"></div>
+    <div id="death-best" class="best-display" style="display:none"></div>
+    <button class="start-btn" id="startBtn">[ ENTER ]</button>
+    <div class="hint">SPACE / CLICK / TAP TO FLAP</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 400, H = 600;
+
+// Game state
+let state = 'idle'; // idle, playing, dead
+let score = 0, best = 0, frame = 0;
+let particles = [], bg_lines = [];
+
+// Bird
+const bird = {
+  x: 90, y: H/2, vy: 0,
+  w: 28, h: 22,
+  rot: 0,
+  trail: [],
+  alive: true
+};
+
+// Pipes
+let pipes = [];
+let pipeTimer = 0;
+
+// Difficulty config (gets harder as score increases)
+function getDiff() {
+  const s = score;
+  return {
+    gap: Math.max(90, 155 - s * 2.5),       // shrinks fast
