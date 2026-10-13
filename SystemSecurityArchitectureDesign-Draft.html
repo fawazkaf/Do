@@ -1,0 +1,1840 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>System Security Architecture Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one SABSA form (six layers x six questions) with a sticky Generate bar; outputs are full-width design documents. */
+:root{
+  --bg:#f3f5f7; --panel:#ffffff; --sunk:#e9edf1; --line:#d5dce3; --fg:#18222d; --muted:#5b6876;
+  --accent:#1f4f8a; --accent-ink:#ffffff; --accent-soft:#e3ecf7;
+  --ok:#1d7a4c; --ok-soft:#e1f2e8; --warn:#a86a00; --warn-soft:#fbf0d9; --crit:#b42828; --crit-soft:#f8e1e1; --na:#8a96a3;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:6px;
+}
+/* Light is the default, whatever the device setting. Dark applies only when the viewer picks the dark theme in Claude. */
+:root[data-theme="dark"]{
+  --bg:#0f151c; --panel:#161f29; --sunk:#1c2733; --line:#2b3846; --fg:#e3e9ef; --muted:#93a1b0;
+  --accent:#7fb0ec; --accent-ink:#0d1620; --accent-soft:#1b2c42;
+  --ok:#5cc58e; --ok-soft:#173326; --warn:#e2ad4a; --warn-soft:#352a14; --crit:#f07c7c; --crit-soft:#3a1c1e; --na:#6f7c8a;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;margin:0}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.2}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono)}
+.wrap{padding-inline:16px;max-width:1320px;margin:0 auto}
+.muted{color:var(--muted)}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--panel);border-bottom:1px solid var(--line)}
+.top .row1{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;padding-block:12px}
+.brand h1{font-size:20px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.syspick{display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 260px}
+.syspick select{min-width:0;flex:0 1 340px;border:1px solid var(--line);background:var(--sunk);border-radius:var(--r);padding:5px 8px;font-weight:600}
+.kpis{display:flex;gap:8px;flex-wrap:wrap}
+.kpi{display:flex;align-items:baseline;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kpi b{font-family:var(--f-mono);color:var(--fg);font-size:13px}
+.kpi.c b{color:var(--crit)} .kpi.h b{color:var(--warn)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 14px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs button:hover{color:var(--fg)}
+.count{font-family:var(--f-mono);font-size:11px;background:var(--sunk);border-radius:999px;padding:1px 6px;margin-left:4px}
+
+.banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin-top:16px;font-size:13px}
+.banner.warn{background:var(--warn-soft)}
+.banner.err{background:var(--crit-soft)}
+.banner p{margin:0;flex:1 1 300px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:6px 12px;cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.big{padding:9px 18px;font-size:14px}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:3px 9px;font-size:12px}
+main{padding-block:16px 48px}
+
+/* form */
+.assess{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px;align-items:start}
+.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 112px);display:flex;flex-direction:column;gap:2px}
+.rail .eyebrow{padding:0 10px 6px}
+.rail button{display:flex;align-items:center;gap:8px;text-align:left;background:none;border:0;border-radius:var(--r);padding:7px 10px;cursor:pointer;color:var(--fg)}
+.rail button:hover{background:var(--sunk)}
+.rail .nm{flex:1;min-width:0}
+.rail .nm small{display:block;color:var(--muted);font-size:11.5px}
+.rail .prog{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--na)}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)}
+.layers{display:flex;flex-direction:column;gap:20px;min-width:0}
+.sect{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);min-width:0;scroll-margin-top:124px}
+.sect-h{padding:18px 20px 14px;border-bottom:2px solid var(--fg)}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sect-h h2{font-size:23px;margin-top:2px}
+.sect-h p{margin:6px 0 0;color:var(--muted);max-width:80ch}
+.cell-h{display:flex;gap:10px;align-items:baseline;padding:10px 20px;background:var(--sunk);border-bottom:1px solid var(--line);border-top:1px solid var(--line)}
+.cell-h:first-of-type{border-top:0}
+.cell-h .qw{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);min-width:52px}
+.cell-h h3{font-size:15px}
+.cell-h span.d{color:var(--muted);font-size:12.5px}
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 20px;padding:13px 20px;border-bottom:1px solid var(--line);align-items:start}
+.q:last-child{border-bottom:0}
+.q.st-gap{box-shadow:inset 3px 0 0 var(--crit)} .q.st-partial{box-shadow:inset 3px 0 0 var(--warn)} .q.st-met{box-shadow:inset 3px 0 0 var(--ok)}
+.q.miss{background:var(--crit-soft)}
+.q .lab{font-weight:500}
+.q .lab .rq{color:var(--crit)}
+.q .help{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:70ch}
+.refs{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.ref{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted);white-space:nowrap}
+.ref.sev-C{border-color:var(--crit);color:var(--crit)} .ref.sev-H{border-color:var(--warn);color:var(--warn)}
+.ref.ba{border-style:dashed}
+.ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-end;max-width:440px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:5px 11px;cursor:pointer;font-size:13px;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button:hover{background:var(--sunk)}
+.seg button[aria-pressed="true"][data-s="met"]{background:var(--ok-soft);color:var(--ok);font-weight:600}
+.seg button[aria-pressed="true"][data-s="partial"]{background:var(--warn-soft);color:var(--warn);font-weight:600}
+.seg button[aria-pressed="true"][data-s="gap"]{background:var(--crit-soft);color:var(--crit);font-weight:600}
+.seg button[aria-pressed="true"][data-s="na"],.seg button[aria-pressed="true"][data-s="info"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.multi{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.multi button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12.5px}
+.multi button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.inp{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:5px 8px;min-width:0;width:280px;max-width:100%}
+.inp.sm{font-size:12.5px}
+.blk{padding:14px 20px;border-bottom:1px solid var(--line)}
+.blk h4{font-size:14.5px}
+.blk .help{color:var(--muted);font-size:12.5px;margin:2px 0 10px;max-width:80ch}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.submitbar{position:sticky;bottom:env(safe-area-inset-bottom,0px);z-index:5;display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;justify-content:space-between;background:var(--panel);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--r);padding:12px 16px;box-shadow:0 -6px 18px -12px rgba(0,0,0,.35)}
+.submitbar .pg{flex:1 1 220px;min-width:0;font-size:13px}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-display);font-weight:600;font-size:12.5px;background:var(--sunk);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{font-variant-numeric:tabular-nums;font-family:var(--f-mono)}
+.et td{padding:4px 5px}
+.et input,.et select{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:3px 6px;width:100%;min-width:96px;font-size:12.5px}
+.et input.w-s{min-width:64px}
+.bapt select{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:3px 6px}
+
+/* docs */
+.doc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:24px clamp(16px,3vw,36px);min-width:0}
+.doc-h{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;border-bottom:2px solid var(--fg);padding-bottom:12px;margin-bottom:18px}
+.doc-h h2{font-size:28px}
+.doc-meta{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);display:grid;grid-template-columns:auto auto;gap:0 12px}
+.part{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-top:1px solid var(--line);margin-top:30px;padding-top:14px}
+.doc h3{font-size:19px;margin:8px 0 8px;display:flex;gap:10px;align-items:baseline}
+.part + h3{margin-top:4px}
+.doc h3:not(.part + h3){margin-top:26px}
+.doc h3 .n{font-family:var(--f-mono);font-size:13px;color:var(--muted);font-weight:400}
+.doc p,.doc li{max-width:85ch}
+.doc ul{padding-left:20px;margin:6px 0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kv div{padding:8px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-width:0}
+.kv dt{font-size:11.5px;color:var(--muted);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase}
+.kv dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.diagram{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);padding:8px}
+.diagram svg{display:block;height:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:10px;border-radius:2px;border:1.5px solid;display:inline-block}
+.ln{width:22px;height:0;border-top:2px solid;display:inline-block}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pill.met,.pill.doc{background:var(--ok-soft);color:var(--ok)} .pill.partial{background:var(--warn-soft);color:var(--warn)}
+.pill.gap{background:var(--crit-soft);color:var(--crit)} .pill.open,.pill.na{background:var(--sunk);color:var(--muted)}
+.pri{font-family:var(--f-mono);font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid var(--line)}
+.pri.High{border-color:var(--fg);font-weight:600}
+.sev{display:inline-block;font-family:var(--f-mono);font-size:11px;font-weight:500;padding:1px 6px;border-radius:3px;border:1px solid}
+.sev.C{color:var(--crit);border-color:var(--crit);background:var(--crit-soft)} .sev.H{color:var(--warn);border-color:var(--warn)}
+.sev.M{color:var(--accent);border-color:var(--accent)} .sev.L{color:var(--muted);border-color:var(--line)}
+.cfg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.cfg .card{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.cfg .card h4{margin:0 0 2px}
+.cfg .card .prod{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.cfg .card ul{font-size:13px}
+.bad{color:var(--crit);font-weight:500}
+.empty{padding:20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+.empty.big{padding:48px 20px;background:var(--panel)}
+.empty.big h2{color:var(--fg);font-size:22px;margin-bottom:6px}
+
+/* SABSA matrix */
+.sx th:first-child,.sx td:first-child{white-space:nowrap}
+.sx td{min-width:132px;font-size:12px}
+.sx td b{display:block;font-size:12.5px;font-weight:600}
+.sx td.c-met,.sx td.c-doc{background:var(--ok-soft)} .sx td.c-partial{background:var(--warn-soft)} .sx td.c-gap{background:var(--crit-soft)}
+.sx td .m{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+
+/* gaps */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-width:0}
+.tile .v{font-family:var(--f-mono);font-size:26px;font-weight:500;font-variant-numeric:tabular-nums}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile.C .v{color:var(--crit)} .tile.H .v{color:var(--warn)}
+.bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:6px;min-width:60px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.chipf{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 11px;cursor:pointer;font-size:12.5px}
+.chipf[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.gap-row td:nth-child(3),.gap-row td:nth-child(4){min-width:250px}
+.gap-row input{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:3px 6px;width:120px}
+.fw{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+details.fold{margin-top:22px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+details.fold>summary{cursor:pointer;padding:12px 16px;font-family:var(--f-display);font-weight:600;font-size:16px}
+details.fold>div{padding:0 16px 16px}
+.dom h3{font-size:16px;margin:14px 0 8px;display:flex;gap:10px;align-items:baseline}
+.dom h3 .n{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+details.items summary{cursor:pointer;color:var(--accent);font-size:12.5px}
+details.items ul{margin:6px 0 0;padding-left:18px;font-size:12.5px}
+.fwgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:12px 0}
+.fwcard{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.fwcard.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.fwcard b{font-family:var(--f-mono)}
+.fwcard p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+tr.cur td{background:var(--accent-soft)}
+
+.ex{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.ex textarea{width:100%;min-height:300px;font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);padding:10px;resize:vertical}
+.ex .tile{display:flex;flex-direction:column;gap:8px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:var(--r);font-size:13px;z-index:50;max-width:90vw}
+.confirm{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+
+/* review */
+.pill.sub{background:var(--accent-soft);color:var(--accent)}
+.pf-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.pf-head h2{font-size:24px}
+.steps{list-style:none;counter-reset:st;display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0 0 8px}
+.steps li{counter-increment:st;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;font-size:12.5px;color:var(--muted);max-width:none}
+.steps li::before{content:counter(st);font-family:var(--f-mono);font-size:11px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--sunk);color:var(--muted)}
+.steps li.ok{color:var(--fg);border-color:var(--ok)}
+.steps li.ok::before{content:"✓";background:var(--ok);color:var(--panel)}
+.lbl{display:block;font-weight:500;margin:12px 0 4px}
+.ta{display:block;width:100%;max-width:85ch;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:8px 10px;resize:vertical}
+.decision{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px;max-width:85ch}
+.decision p{margin:8px 0 0;white-space:pre-wrap}
+.rvbox{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:var(--r);padding:16px clamp(16px,3vw,36px);margin-top:16px;min-width:0}
+.rvbox h3{font-size:17px;margin-bottom:8px}
+.cms{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.doc .cms{padding-left:0}
+.cm{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;max-width:85ch}
+.cm.done{opacity:.65}
+.cm-h{display:flex;gap:6px 12px;align-items:baseline;flex-wrap:wrap}
+.cm p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rvadd{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-width:85ch}
+select:disabled{opacity:.7}
+.disclaimer{font-size:12px;color:var(--muted);margin-top:24px;max-width:90ch}
+
+svg text{font-family:var(--f-body);fill:var(--fg)}
+svg .band{fill:var(--panel);stroke:var(--line)}
+svg .collab{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted);letter-spacing:.06em}
+svg .zone{fill:var(--panel);stroke:var(--fg);stroke-width:1.2}
+svg .zonelab{font-family:var(--f-display);font-weight:600;font-size:13px}
+svg .actor{fill:var(--sunk);stroke:var(--line)}
+svg .xsys{fill:var(--panel);stroke:var(--muted);stroke-dasharray:4 3}
+svg .comp{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+svg .comp.badc{stroke:var(--crit);fill:var(--crit-soft);stroke-width:2}
+svg .chip{stroke-width:1.6;fill:var(--panel)}
+svg .chip.met{stroke:var(--ok);fill:var(--ok-soft)} svg .chip.partial{stroke:var(--warn);fill:var(--warn-soft)}
+svg .chip.gap{stroke:var(--crit);fill:var(--crit-soft);stroke-dasharray:5 3}
+svg .chip.open{stroke:var(--na);stroke-dasharray:2 3}
+svg .cn{font-size:11.5px;font-weight:600} svg .cp{font-size:10px;fill:var(--muted);font-family:var(--f-mono)}
+svg .flow{stroke:var(--muted);stroke-width:1.4;fill:none}
+svg .flow.weak{stroke:var(--crit);stroke-width:1.8;stroke-dasharray:6 3}
+svg .fl{font-family:var(--f-mono);font-size:9.5px;fill:var(--muted);paint-order:stroke;stroke:var(--bg);stroke-width:3px}
+svg .fl.weak{fill:var(--crit)}
+svg .ah{fill:var(--muted)} svg .ahw{fill:var(--crit)}
+
+@media (max-width:820px){
+  .assess{grid-template-columns:1fr}
+  .rail{position:static;flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
+  .rail .eyebrow{display:none}
+  .rail button{white-space:nowrap;border:1px solid var(--line)}
+  .rail .nm small{display:none}
+  .q{grid-template-columns:1fr}
+  .ctl{align-items:flex-start;max-width:none}
+  .multi{justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row1">
+      <div class="brand"><h1>System Security Architecture Design</h1></div>
+      <div class="syspick"><label for="sysSel" class="eyebrow">System</label><select id="sysSel"></select><button class="btn sm" data-act="newsys">New system</button></div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<div class="wrap"><div id="banner"></div></div>
+<main class="wrap" id="main"></main>
+<div class="toast" id="toast" hidden></div>
+<datalist id="endpoints"></datalist>
+
+<!-- PDF export: jsPDF builds the document, autotable lays out its tables -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+/* ============================== NCA LIBRARY ============================== */
+const ECC=[
+ {d:'1',n:'Cybersecurity Governance',s:[
+  ['1-1','Cybersecurity Strategy','Documented, approved strategy and roadmap.'],
+  ['1-2','Cybersecurity Management','Independent cybersecurity function and steering committee.'],
+  ['1-3','Cybersecurity Policies and Procedures','Documented, approved policies, procedures and standards.'],
+  ['1-4','Cybersecurity Roles and Responsibilities','Defined and assigned roles and responsibilities.'],
+  ['1-5','Cybersecurity Risk Management','Risk assessments, including at project start and before major changes.'],
+  ['1-6','Cybersecurity in IT Project Management','Security in projects, change management and secure software development.'],
+  ['1-7','Compliance with Cybersecurity Standards, Laws and Regulations','Compliance with national laws and regulations.'],
+  ['1-8','Periodical Cybersecurity Review and Audit','Periodic review and independent audit.'],
+  ['1-9','Cybersecurity in Human Resources','Security before, during and at the end of employment.'],
+  ['1-10','Cybersecurity Awareness and Training Program','Awareness and specialised training.']]},
+ {d:'2',n:'Cybersecurity Defense',s:[
+  ['2-1','Asset Management','Inventory, ownership and classification of assets.'],
+  ['2-2','Identity and Access Management','Unique identities, MFA, least privilege and privileged access management.'],
+  ['2-3','Information System and Processing Facilities Protection','Malware protection, patching, hardening, time synchronisation.'],
+  ['2-4','Email Protection','Email filtering, MFA for webmail, archiving, APT protection.'],
+  ['2-5','Networks Security Management','Segmentation, firewalls, port/protocol restriction, IPS, secure DNS.'],
+  ['2-6','Mobile Devices Security','Managed devices, BYOD separation, encryption and wipe.'],
+  ['2-7','Data and Information Protection','Classification-driven protection and privacy of data.'],
+  ['2-8','Cryptography','Approved cryptography, key management, encryption in transit and at rest.'],
+  ['2-9','Backup and Recovery Management','Backup scope, frequency, protection and restore testing.'],
+  ['2-10','Vulnerabilities Management','Vulnerability assessment and remediation.'],
+  ['2-11','Penetration Testing','Penetration testing of external and critical services.'],
+  ['2-12','Cybersecurity Event Logs and Monitoring Management','Logging, SIEM, continuous monitoring and retention (minimum 12 months).'],
+  ['2-13','Cybersecurity Incident and Threat Management','Incident response, NCA reporting and threat intelligence.'],
+  ['2-14','Physical Security','Protection of facilities and media.'],
+  ['2-15','Web Application Security','WAF, multi-tier architecture, secure protocols, usage policy and user MFA.']]},
+ {d:'3',n:'Cybersecurity Resilience',s:[
+  ['3-1','Cybersecurity Resilience Aspects of BCM','Cybersecurity in business continuity and disaster recovery.']]},
+ {d:'4',n:'Third-Party and Cloud Computing Cybersecurity',s:[
+  ['4-1','Third-Party Cybersecurity','Contract requirements, NDAs, supplier risk and managed-service controls.'],
+  ['4-2','Cloud Computing and Hosting Cybersecurity','Cloud requirements including segregation and hosting inside the Kingdom.']]}
+];
+const SUBNAME={};ECC.forEach(d=>d.s.forEach(s=>SUBNAME[s[0]]=s[1]));
+
+/* ============================== PREDICATES ============================== */
+const INFRA='Infrastructure service (AD, DNS, email, etc.)';
+const isSaaS=a=>a.hosting==='SaaS (provider-managed)'||a.sysType==='SaaS application'||a.devModel==='SaaS subscription';
+const isCloud=a=>/cloud|SaaS|Hybrid/i.test(a.hosting||'')||isSaaS(a);
+const inet=a=>(a.exposure||'').startsWith('Internet');
+const isOT=a=>a.sysType==='OT / ICS system';
+const isMobile=a=>a.sysType==='Mobile application + backend';
+const webish=a=>['Web application','Mobile application + backend','API / integration service','SaaS application'].includes(a.sysType)||inet(a);
+const codeOwned=a=>['In-house developed','Vendor-developed (custom)'].includes(a.devModel);
+const vendor=a=>!!a.devModel&&a.devModel!=='In-house developed';
+const selfHost=a=>!isSaaS(a);
+const appOk=a=>!isSaaS(a)&&a.sysType!==INFRA;
+const classified=a=>!!a.dataClass&&a.dataClass!=='Public';
+const hasTier=t=>cur().comps.some(c=>c.tier===t);
+const hasDB=a=>hasTier('Database')||a.sysType==='Database / data platform';
+const hasAPI=a=>hasTier('API gateway')||a.sysType==='API / integration service'||isMobile(a);
+
+const FRAMEWORKS=[
+ {k:'ECC',n:'ECC-2:2024',d:'Essential Cybersecurity Controls. Baseline for every system.',on:()=>true},
+ {k:'CSCC',n:'CSCC',d:'Critical Systems Cybersecurity Controls. Applies when the system is designated critical.',on:a=>a.critical==='Yes'},
+ {k:'CCC',n:'CCC',d:'Cloud Cybersecurity Controls. Applies to cloud-hosted and SaaS systems.',on:a=>isCloud(a)},
+ {k:'DCC',n:'DCC',d:'Data Cybersecurity Controls. Applies when data is classified above Public.',on:a=>classified(a)},
+ {k:'OTCC',n:'OTCC',d:'Operational Technology Cybersecurity Controls. Applies to OT / ICS systems.',on:a=>isOT(a)}
+];
+
+/* Data Cybersecurity Controls (DCC-1:2022): subdomains, and which form questions evidence each one */
+const DCC=[
+ {d:'1',n:'Cybersecurity Governance',s:[
+  ['1-1','Periodical Cybersecurity Review and Audit','Data protection controls reviewed and audited periodically.'],
+  ['1-2','Cybersecurity in Human Resources','Screening and obligations for personnel who handle classified data.'],
+  ['1-3','Cybersecurity Awareness and Training Program','Training on classifying, handling, sharing and disposing of data.']]},
+ {d:'2',n:'Cybersecurity Defense',s:[
+  ['2-1','Identity and Access Management','Need-to-know access and privileged access control for classified data.'],
+  ['2-2','Information System and Information Processing Facilities Protection','Hardening, patching and restriction of capture and removable media on systems holding data.'],
+  ['2-3','Mobile Devices Security','Classified data on mobile devices only under management, encryption and remote wipe.'],
+  ['2-4','Data and Information Protection','Classification, leakage prevention, masking, watermarking and retention.'],
+  ['2-5','Cryptography','Encryption in transit and at rest with managed keys per the national standards.'],
+  ['2-6','Secure Data Disposal','Secure deletion of data and destruction of media with records.'],
+  ['2-7','Cybersecurity for Printers, Scanners and Copy Machines','Controlled printing and scanning of classified data.']]},
+ {d:'3',n:'Third-Party and Cloud Computing Cybersecurity',s:[
+  ['3-1','Third-Party Cybersecurity','Vetting, contractual protection and deletion duties for third parties handling data.']]}
+];
+const DCCNAME={};DCC.forEach(d=>d.s.forEach(s=>DCCNAME[s[0]]=s[1]));
+const DCCMAP={
+ dccReview:['1-1'],dccVet:['1-2'],dccAware:['1-3'],
+ dccNeed:['2-1'],iUnique:['2-1'],iRbac:['2-1'],iPam:['2-1'],iMfaAdm:['2-1'],iMfaExt:['2-1'],iReview:['2-1'],iLeaver:['2-1'],
+ dccCapture:['2-2'],hHarden:['2-2'],hPatch:['2-2'],hEdr:['2-2'],
+ dccMobile:['2-3'],sMob:['2-3'],
+ gClass:['2-4'],dDlp:['2-4'],sMask:['2-4'],dRet:['2-4'],gPdpl:['2-4'],dDam:['2-4'],dccWater:['2-4'],
+ dRest:['2-5'],dTls:['2-5'],dKms:['2-5'],dNcs:['2-5'],kRot:['2-5'],wHttps:['2-5'],dCert:['2-5'],
+ dccDispose:['2-6'],cExit:['2-6','3-1'],
+ dccPrint:['2-7'],
+ dccTp:['3-1'],tContract:['3-1'],tRemote:['3-1'],cTenant:['3-1']
+};
+
+/* ============================== SABSA: BUSINESS ATTRIBUTES ============================== */
+const BA={
+ conf:['Confidential','Information is disclosed only to authorised parties.','Share of classified stores and flows encrypted'],
+ integ:['Integrity-assured','Data, code and transactions cannot be altered undetected.','Unauthorised change incidents; code and config under control'],
+ avail:['Available','The service is usable whenever the business needs it.','Measured availability against target'],
+ access:['Access-controlled','Access is granted by role and need, and removed when no longer required.','Accounts mapped to roles; no shared or default accounts'],
+ auth:['Authenticated','Every user, administrator and system proves its identity.','Share of entry points with strong authentication / MFA'],
+ acct:['Accountable','Actions are attributable to an individual and auditable.','Audit log coverage and retention'],
+ mon:['Monitored','Security events are detected and acted on in time.','Log sources onboarded; detection use cases; SOC coverage'],
+ recov:['Recoverable','The system can be restored within RTO and RPO.','Restore and DR test results against RTO/RPO'],
+ prot:['Protected','The system resists attack: hardened, patched and segregated.','Patch SLA compliance; hardening drift; open vulnerabilities'],
+ priv:['Private','Personal data is handled according to PDPL.','PDPL obligations met; privacy incidents'],
+ comp:['Compliant','The system meets NCA controls and applicable law.','ECC compliance score for the system'],
+ gov:['Governed','The system is owned, risk-assessed and changed under control.','Risk assessment and security sign-off completed'],
+ assure:['Assured','Security is independently tested and verified.','Scan and penetration test results; findings fixed before go-live'],
+ supp:['Supplier-assured','Vendors and cloud providers meet the same requirements.','Contracts with security clauses; provider compliance evidence']
+};
+const QN={W:['What','Assets'],Y:['Why','Motivation'],H:['How','Process'],P:['Who','People'],L:['Where','Location'],T:['When','Time']};
+const QK=['W','Y','H','P','L','T'];
+
+/* ============================== SABSA FORM (6 layers x 6 questions) ============================== */
+const SEV={C:{n:'Critical',w:4},H:{n:'High',w:3},M:{n:'Medium',w:2},L:{n:'Low',w:1}};
+const TRI=[['Yes','met'],['Partial','partial'],['No','gap'],['N/A','na']];
+const SYS_TYPES=['Web application','Mobile application + backend','API / integration service','Commercial off-the-shelf (COTS) application','SaaS application','Database / data platform',INFRA,'Desktop / client-server application','OT / ICS system'];
+
+const LAYERS=[
+{id:'ctx',n:'Contextual',view:'Business view',p:'What the business needs from this system or project: what is at stake, the risks, the people, the places and the deadlines. Nothing here is a control; it sets the requirements the controls are traced to.',cells:[
+ {q:'W',n:'Business assets',fields:[
+  {id:'sysName',t:'text',l:'System name',req:1},
+  {id:'projName',t:'text',l:'Project name',h:'Leave blank if the system is not part of a project.'},
+  {id:'sysDesc',t:'text',l:'What the system is for',h:'One line, e.g. "Online permit applications for citizens and businesses".'},
+  {id:'sysType',t:'sel',l:'System type',o:SYS_TYPES,req:1},
+  {id:'dataClass',t:'sel',l:'Highest data classification',o:['Top Secret','Secret','Restricted','Public'],req:1},
+  {id:'personal',t:'yn',l:'Holds personal data'},
+  {id:'critical',t:'yn',l:'Critical system',h:'Yes brings the Critical Systems Cybersecurity Controls (CSCC) into scope.'}]},
+ {q:'Y',n:'Business risk',fields:[
+  {id:'drivers',t:'multi',l:'Why security matters for this system',o:['Regulatory compliance','Service availability','Protection of sensitive data','Public trust and reputation','Fraud prevention','Operational efficiency','Speed of digital delivery','Safety']},
+  {id:'threats',t:'multi',l:'Threats of most concern',o:['Data breach or leakage','Ransomware / destructive attack','Account takeover','Service outage / DDoS','Insider misuse','Vendor or supply-chain compromise','Fraud / transaction tampering','Web and API attacks']},
+  {id:'bImpact',t:'sel',l:'Business impact if compromised',o:['Catastrophic','Major','Moderate','Minor']},
+  {id:'appetite',t:'sel',l:'Risk appetite',o:['Low','Medium','High']}]},
+ {q:'H',n:'Business processes',fields:[
+  {id:'bProc',t:'text',l:'Business processes supported',h:'e.g. "Permit application, payment, review, issuance".'},
+  {id:'devModel',t:'sel',l:'How the system is sourced',o:['In-house developed','Vendor-developed (custom)','COTS / packaged product','SaaS subscription']},
+  {id:'exposure',t:'sel',l:'How the system is reached',o:['Internet-facing (public users)','Internet-facing (staff / partners only)','Internal only'],req:1}]},
+ {q:'P',n:'Business organisation',fields:[
+  {id:'owner',t:'text',l:'Business owner'},
+  {id:'techOwner',t:'text',l:'Technical owner / project manager'},
+  {id:'usersPublic',t:'yn',l:'Used by the public'},
+  {id:'usersStaff',t:'yn',l:'Used by internal staff'},
+  {id:'usersPartner',t:'yn',l:'Used by partners or other entities'},
+  {id:'userCount',t:'num',l:'Expected number of users'}]},
+ {q:'L',n:'Business geography',fields:[
+  {id:'hosting',t:'sel',l:'Hosting model',o:['On-premises data center','Private cloud','Public cloud IaaS','Public cloud PaaS','SaaS (provider-managed)','Hybrid'],req:1},
+  {id:'sites',t:'text',l:'Hosting sites',h:'e.g. "Riyadh primary DC, Jeddah DR".'},
+  {id:'userGeo',t:'sel',l:'Where users connect from',o:['Inside the Kingdom only','Kingdom and GCC','Worldwide']}]},
+ {q:'T',n:'Business time dependence',fields:[
+  {id:'stage',t:'sel',l:'Project stage',o:['Planning','Design','Build','Testing','Ready for go-live','Live']},
+  {id:'goLive',t:'text',l:'Planned go-live date',h:'e.g. 2027-03-01.'},
+  {id:'svcHours',t:'sel',l:'Service hours',o:['24x7','Extended hours','Business hours']},
+  {id:'avail',t:'sel',l:'Availability target',o:['99.99%','99.9%','99.5%','Best effort']},
+  {id:'rto',t:'num',l:'Maximum downtime, RTO (hours)'},
+  {id:'rpo',t:'num',l:'Maximum data loss, RPO (hours)'}]}
+]},
+{id:'con',n:'Conceptual',view:"Architect's view",p:'The security concepts that answer the business needs: which attributes matter, what the controls must achieve, the strategy, who is responsible, and where the security boundaries are.',cells:[
+ {q:'W',n:'Business Attributes Profile',special:'bap',fields:[
+  {id:'gClass',t:'tri',l:'Data classification is assigned to the system',c:['2-1-3','2-7-3'],s:'M',ba:['gov','conf'],r:'Classify the system and its data and record the classification in the asset inventory.'}]},
+ {q:'Y',n:'Control objectives',fields:[
+  {id:'gRisk',t:'tri',l:'Security risk assessment is done for this project',c:['1-5-3'],s:'H',ba:['gov','comp'],r:'Carry out a security risk assessment for the system and record the risks and treatments.'},
+  {id:'sThreat',t:'tri',l:'Threat model is reviewed and accepted by the project and cybersecurity',h:'This tool generates a STRIDE threat model from the form. Answer Yes once the team has reviewed it.',c:['1-5-3','1-6-3'],s:'M',ba:['gov','prot'],r:'Review the generated threat model with the project team and cybersecurity, add system-specific threats, and plan the open mitigations.'},
+  {id:'gReq',t:'tri',l:'Security requirements are written and approved',c:['1-6-1'],s:'M',ba:['gov','comp'],r:'Write the security requirements for the system and have the cybersecurity function approve them.'}]},
+ {q:'H',n:'Security strategy',fields:[
+  {id:'strat',t:'multi',l:'Security strategies used',o:['Defence in depth','Zero trust','Least privilege','Secure by design','Privacy by design','Assume breach']},
+  {id:'gGolive',t:'tri',l:'Cybersecurity sign-off is required before go-live',c:['1-6-2'],s:'H',ba:['gov','assure'],r:'Make cybersecurity sign-off a mandatory go-live gate in the project plan.'}]},
+ {q:'P',n:'Roles and trust framework',fields:[
+  {id:'gRoles',t:'tri',l:'Business owner, technical owner and administrators are named',c:['1-4-1'],s:'M',ba:['gov','acct'],r:'Name the business owner, technical owner and administrators and record their security responsibilities.'},
+  {id:'tContract',t:'tri',l:'Vendor contract has security clauses and an NDA',c:['4-1-3'],s:'H',ba:['supp','comp'],show:vendor,r:'Add security clauses, an NDA, incident notification and right to audit to the vendor contract.'},
+  {id:'dccTp',t:'tri',l:'Contract obliges third parties to protect, return and delete the data',c:['4-1-3'],s:'H',ba:['supp','conf'],show:a=>classified(a)&&(vendor(a)||isCloud(a)),r:'Add contract terms that oblige third parties to protect the data, return it and delete it with a certificate.'}]},
+ {q:'L',n:'Security domain model',fields:[
+  {id:'hSeg',t:'tri',l:'Each tier is in its own network zone',c:['2-5-3-1'],s:'C',f:['ccc','ot'],ba:['prot','conf'],show:selfHost,r:'Put web, application and database tiers in separate zones behind the internal firewall.'},
+  {id:'cKsa',t:'tri',l:'Data is hosted, processed and stored inside the Kingdom',c:['4-2-3'],s:'C',f:['ccc'],ba:['comp','supp'],show:isCloud,r:'Use a cloud region and provider that keep hosting, processing and storage inside the Kingdom.'}]},
+ {q:'T',n:'Security lifetimes and deadlines',fields:[
+  {id:'dRet',t:'tri',l:'Data retention period and deletion method are defined',c:['2-7-3'],s:'M',ba:['priv','comp'],r:'Define how long each data set is kept and how it is deleted.'},
+  {id:'lRet',t:'num',l:'Log retention configured (months)',h:'ECC needs at least 12 months. Under 18 months is flagged for critical systems (CSCC).',c:['2-12-3-5'],s:'H',ba:['acct','comp'],
+   ev:(v,a)=>{v=+v;if(isNaN(v))return null;if(v<12)return 'gap';if(a.critical==='Yes'&&v<18)return 'partial';return 'met'},
+   r:'Configure log retention of at least 12 months (18 months for a critical system).'}]}
+]},
+{id:'log',n:'Logical',view:"Designer's view",p:'The security services in the design: what information is protected, the rules, how users and components are identified, and how the parts connect.',cells:[
+ {q:'W',n:'Information assets',fields:[
+  {id:'gInv',t:'tri',l:'Components will be registered in the asset inventory with an owner',c:['2-1-3'],s:'M',ba:['gov'],r:'Plan to register every component of the system in the asset inventory with a named owner.'},
+  {id:'dDlp',t:'tri',l:'Bulk export and download of classified data is restricted',c:['2-7-3'],s:'M',ba:['conf'],show:classified,r:'Limit and log bulk exports and downloads, and apply DLP to classified data.'},
+  {id:'sMask',t:'tri',l:'Test environments use masked or synthetic data, not real data',c:['2-7-3'],s:'M',ba:['conf','priv'],show:appOk,r:'Use masked or synthetic data in development and test environments.'},
+  {id:'dccWater',t:'tri',l:'Classified reports and exports are labelled and watermarked',c:['2-7-3'],s:'M',ba:['conf','acct'],show:classified,r:'Label every output with its classification and watermark it with the user name.'}]},
+ {q:'Y',n:'Risk management policies',fields:[
+  {id:'gPdpl',t:'tri',l:'Personal data handling meets PDPL',c:['1-7-1','2-7-3'],s:'M',ba:['priv','comp'],show:a=>a.personal==='Yes',r:'Record the purpose and legal basis for the personal data, limit what is collected, and keep it inside the Kingdom unless transfer is permitted.'},
+  {id:'wPolicy',t:'tri',l:'Terms of use and secure-usage guidance are shown to users',c:['2-15-3-4'],s:'L',ba:['comp'],show:a=>a.usersPublic==='Yes'&&webish(a),r:'Publish terms of use and secure-usage guidance in the application.'},
+  {id:'gDocs',t:'tri',l:'Architecture and data flows are documented',c:['1-6-2'],s:'L',ba:['gov'],r:'Document the architecture and data flows (this HLD and LLD) and store them with the project records.'}]},
+ {q:'H',n:'Security services',fields:[
+  {id:'wTier',t:'tri',l:'Web, application and database tiers are separated',c:['2-15-3-2'],s:'H',ba:['prot'],show:a=>webish(a)&&selfHost(a),r:'Separate the web, application and database tiers so the database is never reachable from the web tier or the internet.'},
+  {id:'wHttps',t:'tri',l:'HTTPS only, with HSTS and security headers',c:['2-15-3-3'],s:'H',ba:['conf','integ'],show:webish,r:'Serve everything over HTTPS only and turn on HSTS, CSP and secure cookie flags.'},
+  {id:'sOwasp',t:'tri',l:'OWASP Top 10 protections are built in and tested',c:['2-15-3'],s:'H',ba:['integ','prot'],show:a=>webish(a)&&appOk(a),r:'Build in input validation and the OWASP Top 10 protections, and test them before release.'},
+  {id:'lApp',t:'tri',l:'Application keeps an audit trail (logins, failures, permission changes, data access, admin actions)',c:['2-12-3-1'],s:'H',ba:['acct','mon'],r:'Build an audit trail that records logins, failures, permission changes, sensitive data access and admin actions.'}]},
+ {q:'P',n:'Entity schema and privilege profiles',fields:[
+  {id:'iSso',t:'tri',l:'Users log in through the central identity provider (SSO)',c:['2-2-3-1'],s:'H',p:'IdP / SSO (e.g. Entra ID, national SSO)',f:['ccc'],ba:['auth'],r:'Connect the system to the entity identity provider (or national SSO for the public) instead of a local user store.'},
+  {id:'iUnique',t:'tri',l:'Every user has their own account (no shared logins)',c:['2-2-3-1'],s:'H',ba:['acct','auth'],r:'Give every user a named account and remove shared or generic logins.'},
+  {id:'iRbac',t:'tri',l:'Access is by role, with least privilege',c:['2-2-3-3'],s:'H',ba:['access'],r:'Define roles in the application and give each role only the access it needs.'},
+  {id:'dccNeed',t:'tri',l:'Access to classified data needs data-owner approval',c:['2-2-3-3'],s:'H',ba:['access','conf'],show:classified,r:'Require the data owner to approve every grant of access to classified data.'},
+  {id:'iSvc',t:'tri',l:'Service accounts cannot log in interactively and their passwords are in a vault',c:['2-2-3-4'],s:'M',ba:['access','auth'],r:'Block interactive login for service accounts and keep their credentials in a vault.'}]},
+ {q:'L',n:'Domain definitions and associations',special:'arch',fields:[
+  {id:'hFw',t:'tri',l:'Firewall allows only the documented flows and denies the rest',c:['2-5-3-5'],s:'H',f:['ccc'],ba:['prot'],show:selfHost,r:'Configure the firewalls with the LLD rule set only, and deny and log everything else.'}]},
+ {q:'T',n:'Security processing cycle',fields:[
+  {id:'iSession',t:'tri',l:'Session timeout and account lockout are configured',c:['2-2-3-1'],s:'M',ba:['auth'],r:'Set an idle session timeout and lock accounts after repeated failed logins.'},
+  {id:'iLeaver',t:'tri',l:'Accounts are created and removed automatically from the HR / identity process',c:['2-2-3'],s:'M',ba:['access'],r:'Link the system to the central joiner and leaver process so accounts are removed when people leave.'}]}
+]},
+{id:'phy',n:'Physical',view:"Builder's view",p:'The mechanisms that will be built: how data is protected, the security products used, how people get in, and the platform the system runs on.',cells:[
+ {q:'W',n:'Data assets',fields:[
+  {id:'dRest',t:'tri',l:'Data at rest is encrypted (databases, files, backups)',c:['2-8-3'],s:'H',f:['ccc'],ba:['conf'],r:'Turn on encryption for databases, file stores and backups.'},
+  {id:'bScope',t:'tri',l:'Backups are configured for data and configuration',c:['2-9-3'],s:'H',p:'Backup platform',f:['ccc','ot'],ba:['recov'],r:'Configure backups of the databases, files and configuration to meet the RPO.'},
+  {id:'bImm',t:'tri',l:'An offline or immutable backup copy exists',c:['2-9-3'],s:'C',ba:['recov','integ'],show:selfHost,r:'Keep one backup copy offline or immutable, out of reach of production admin accounts.'},
+  {id:'cTenant',t:'tri',l:'Our data and keys are separated from other cloud customers',c:['4-2-3'],s:'H',f:['ccc'],ba:['conf','supp'],show:isCloud,r:'Confirm tenant separation with the provider and use customer-managed keys for Restricted data and above.'}]},
+ {q:'Y',n:'Security rules, practices and procedures',fields:[
+  {id:'sEnv',t:'tri',l:'Development, test and production are separate',c:['1-6-3'],s:'M',ba:['integ','prot'],show:appOk,r:'Build separate development, test and production environments with separate access.'}]},
+ {q:'H',n:'Security mechanisms',fields:[
+  {id:'wWaf',t:'tri',l:'Web application firewall is in front of the system, in blocking mode',c:['2-15-3-1'],s:'H',p:'WAF product',f:['ccc'],ba:['prot'],show:a=>inet(a)&&webish(a),r:'Publish the system through a WAF in blocking mode.'},
+  {id:'wApi',t:'tri',l:'APIs go through an API gateway (authentication and rate limits)',c:['2-15-3','2-5-3'],s:'H',p:'API gateway',ba:['prot','auth'],show:hasAPI,r:'Put all APIs behind an API gateway that enforces authentication and rate limits.'},
+  {id:'wDdos',t:'tri',l:'DDoS protection is on for public endpoints',c:['2-5-3','3-1-3'],s:'H',ba:['avail'],show:inet,r:'Enable DDoS protection for the public endpoints.'},
+  {id:'wBot',t:'tri',l:'Rate limiting or CAPTCHA on login and sensitive forms',c:['2-15-3'],s:'L',ba:['avail','prot'],show:a=>a.usersPublic==='Yes'&&webish(a),r:'Add rate limiting or CAPTCHA to login, registration and OTP forms.'},
+  {id:'dTls',t:'sel',l:'Lowest TLS version allowed',o:[['TLS 1.3','met'],['TLS 1.2','met'],['TLS 1.0/1.1 still allowed','gap'],['Unknown','gap']],c:['2-8-3'],s:'H',f:['ccc'],ba:['conf','integ'],r:'Turn off SSL, TLS 1.0 and TLS 1.1 and allow TLS 1.2 or higher only.'},
+  {id:'dKms',t:'sel',l:'Where encryption keys are kept',o:[['HSM','met'],['Software key vault','partial'],['Files or manual handling','gap'],['Not defined','gap']],c:['2-8-3'],s:'H',f:['ccc'],ba:['conf'],r:'Keep encryption keys in an HSM or a managed key vault, not in files.'},
+  {id:'sSecrets',t:'tri',l:'No passwords or keys in code or configuration files',c:['2-8-3','2-2-3'],s:'H',ba:['conf','auth'],show:appOk,r:'Move passwords, keys and tokens out of code and configuration into a secrets vault.'},
+  {id:'hEdr',t:'tri',l:'EDR / anti-malware is installed on every server',c:['2-3-3-1'],s:'H',p:'EDR product',f:['ccc'],ba:['prot','mon'],show:selfHost,r:'Install EDR on every server of the system.'},
+  {id:'lSiem',t:'tri',l:'Every component sends its logs to the SIEM',c:['2-12-3-3'],s:'C',p:'SIEM',f:['ccc','ot'],ba:['mon','acct'],r:'Send application, server, database, WAF and gateway logs to the SIEM.'}]},
+ {q:'P',n:'Users, applications and interfaces',fields:[
+  {id:'iMfaExt',t:'tri',l:'MFA for all access from the internet',c:['2-2-3-2'],s:'C',f:['ccc'],ba:['auth'],show:inet,r:'Require MFA for every login that comes from the internet.'},
+  {id:'iMfaPub',t:'tri',l:'MFA is available to public users',c:['2-15-3-5'],s:'M',ba:['auth'],show:a=>a.usersPublic==='Yes'&&webish(a),r:'Offer MFA to public users (national SSO or one-time code), at least for sensitive actions.'},
+  {id:'iMfaAdm',t:'tri',l:'MFA for all administrators',c:['2-2-3-2','2-2-3-4'],s:'C',f:['ccc','ot'],ba:['auth','access'],r:'Require MFA for every administrator login to the application, servers, database and cloud console.'},
+  {id:'iPam',t:'tri',l:'Administrator access goes through PAM',c:['2-2-3-4'],s:'H',p:'PAM product',f:['ccc','ot'],ba:['access','acct'],r:'Put all administrator accounts of this system in PAM, with session recording.'},
+  {id:'cSso',t:'tri',l:'SaaS uses our SSO and sends its audit logs to our SIEM',c:['4-2-3','2-12-3-3'],s:'M',f:['ccc'],ba:['auth','mon'],show:isSaaS,r:'Connect the SaaS to the entity SSO and send its audit logs to the SIEM.'},
+  {id:'sMob',t:'tri',l:'Mobile app is hardened (no sensitive data on device, certificate pinning, root detection)',c:['2-6-3','2-15-3'],s:'M',ba:['prot','conf'],show:isMobile,r:'Apply the OWASP MASVS controls to the mobile app and test it before release.'}]},
+ {q:'L',n:'Platform and network infrastructure',fields:[
+  {id:'hMgmt',t:'tri',l:'Admin interfaces are reachable only from the management network',c:['2-5-3-1','2-2-3-4'],s:'H',f:['ot'],ba:['prot','access'],show:selfHost,r:'Allow SSH, RDP and admin consoles only from PAM jump hosts in the management network.'},
+  {id:'rHa',t:'tri',l:'No single point of failure (meets the availability target)',c:['3-1-3'],s:'M',ba:['avail'],r:'Add redundancy to every tier so the system meets its availability target.'},
+  {id:'rDr',t:'tri',l:'A DR site is built for this system (meets RTO and RPO)',c:['3-1-3'],s:'H',ba:['recov','avail'],r:'Build disaster recovery for the system inside the Kingdom that meets the RTO and RPO.'},
+  {id:'otSeg',t:'tri',l:'OT is separated from IT by an industrial DMZ',c:['2-5-3-1'],s:'C',f:['ot'],ba:['prot'],show:isOT,r:'Put an industrial DMZ between IT and OT with no direct connections.'},
+  {id:'otInet',t:'tri',l:'OT components have no internet access',c:['2-5-3-1'],s:'C',f:['ot'],ba:['prot'],show:isOT,r:'Block internet access from all OT components.'},
+  {id:'otSis',t:'tri',l:'Safety systems are isolated',c:['2-5-3-1'],s:'C',f:['ot'],ba:['prot','avail'],show:isOT,r:'Isolate the safety instrumented systems and allow no remote write access.'}]},
+ {q:'T',n:'Control structure execution',fields:[
+  {id:'lPriv',t:'tri',l:'Administrator and remote sessions are logged',c:['2-12-3-2'],s:'H',f:['ccc'],ba:['acct'],r:'Log every administrator and remote session.'},
+  {id:'dDam',t:'tri',l:'Database activity monitoring is on',c:['2-12-3-2'],s:'M',ba:['mon','conf'],show:hasDB,r:'Turn on database activity monitoring for administrator and bulk queries.'},
+  {id:'lInteg',t:'tri',l:'Logs leave the server immediately and cannot be changed',c:['2-12-3'],s:'M',ba:['acct','integ'],r:'Forward logs in real time and protect the stored logs from change.'},
+  {id:'otMon',t:'tri',l:'OT network monitoring is installed',c:['2-12-3-4'],s:'M',f:['ot'],ba:['mon'],show:isOT,r:'Install passive OT network monitoring that alerts the SOC.'}]}
+]},
+{id:'cmp',n:'Component',view:"Tradesman's view",p:'The exact standards, versions, accounts and settings used to build the system.',cells:[
+ {q:'W',n:'ICT components',fields:[
+  {id:'hEol',t:'tri',l:'All software versions are supported by the vendor (nothing end-of-life)',c:['2-3-3','2-10-3'],s:'H',ba:['prot'],show:selfHost,r:'Use only vendor-supported versions of the OS, middleware and database.'},
+  {id:'sSca',t:'tri',l:'Third-party libraries are scanned for known vulnerabilities',c:['1-6-3'],s:'M',ba:['integ','prot'],show:a=>codeOwned(a)&&appOk(a),r:'Scan third-party libraries for known vulnerabilities and fix them before release.'}]},
+ {q:'Y',n:'Security standards',fields:[
+  {id:'hHarden',t:'tri',l:'Servers, middleware and databases are hardened to a CIS or vendor baseline',c:['2-3-3'],s:'H',f:['ccc','ot'],ba:['prot'],show:selfHost,r:'Apply the CIS or vendor hardening baseline to every component.'},
+  {id:'dNcs',t:'tri',l:'Encryption follows the National Cryptographic Standards',c:['2-8-3'],s:'M',ba:['conf','comp'],r:'Use algorithms and key lengths from the NCA National Cryptographic Standards.'},
+  {id:'sCode',t:'tri',l:'Code is reviewed and scanned (SAST) before release',c:['1-6-3'],s:'H',ba:['integ','prot'],show:a=>codeOwned(a)&&appOk(a),r:'Review the code and run a static scan (SAST) before every release.'},
+  {id:'cProv',t:'tri',l:'Cloud provider complies with NCA CCC',c:['4-2-3'],s:'H',f:['ccc'],ba:['supp','comp'],show:isCloud,r:'Use a provider that complies with the NCA Cloud Cybersecurity Controls and keep the evidence.'}]},
+ {q:'H',n:'Security products and tools',fields:[
+  {id:'sVendor',t:'tri',l:'Vendor provides security patches for the product',c:['2-3-3-3','2-10-3'],s:'H',ba:['prot','supp'],show:a=>appOk(a)&&['COTS / packaged product','Vendor-developed (custom)'].includes(a.devModel),r:'Make sure the support contract includes security patches for the product.'},
+  {id:'dCert',t:'tri',l:'Certificates come from a trusted certificate authority',c:['2-8-3'],s:'L',ba:['conf','avail'],r:'Use certificates from the approved certificate authority.'}]},
+ {q:'P',n:'Identities, functions and access lists',fields:[
+  {id:'iDefault',t:'tri',l:'Default accounts and passwords are removed or changed',c:['2-2-3-1'],s:'M',ba:['auth','prot'],r:'Remove or disable default accounts and change every default password.'},
+  {id:'tRemote',t:'tri',l:'Vendor support access goes through PAM and is recorded',c:['4-1-3','2-2-3-4'],s:'H',ba:['access','supp'],show:vendor,r:'Give the vendor access only through PAM, with approval and session recording.'},
+  {id:'otRemote',t:'tri',l:'OT vendor remote access goes through the industrial DMZ',c:['2-2-3-4'],s:'H',f:['ot'],ba:['access'],show:isOT,r:'Route vendor remote access through the industrial DMZ jump host with recording.'}]},
+ {q:'L',n:'Nodes, addresses and protocols',fields:[
+  {id:'nPorts',t:'tri',l:'Only the needed ports and protocols are open',c:['2-5-3-5'],s:'M',ba:['prot'],show:selfHost,r:'Close unused ports and turn off insecure protocols such as Telnet, FTP and SMBv1.'},
+  {id:'hNtp',t:'tri',l:'Clocks are synchronised to the central time server',c:['2-3-3-4'],s:'L',ba:['acct'],show:selfHost,r:'Point every component to the entity time (NTP) servers.'}]},
+ {q:'T',n:'Security step timing',fields:[
+  {id:'hPatch',t:'tri',l:'Full patching of every component is planned before go-live',c:['2-3-3-3'],s:'H',ba:['prot'],show:selfHost,r:'Plan to apply all security patches to every component before go-live.'}]}
+]},
+{id:'ops',n:'Service management',view:'Operational view',p:'What the project commits to before go-live: the tests, monitoring and handover that are planned now and carried out once the system is built.',cells:[
+ {q:'W',n:'Operational continuity',fields:[
+  {id:'bTest',t:'tri',l:'A backup restore test is planned before go-live',c:['2-9-3'],s:'H',ba:['recov','assure'],r:'Plan a full restore test before go-live and record the time it takes.'},
+  {id:'rDrTest',t:'tri',l:'A DR failover test is planned before go-live',c:['3-1-3'],s:'M',ba:['recov','assure'],r:'Plan a DR failover test before go-live and compare the result with the RTO and RPO.'}]},
+ {q:'Y',n:'Operational risk management',fields:[
+  {id:'vScan',t:'tri',l:'A vulnerability scan is planned before go-live, with critical and high findings fixed',c:['2-10-3'],s:'H',p:'Vulnerability scanner',f:['ccc','ot'],ba:['assure','prot'],show:selfHost,r:'Plan a scan of every component before go-live, with time to fix all critical and high findings.'},
+  {id:'pPre',t:'tri',l:'A penetration test is planned before go-live, with its findings fixed',c:['2-11-3'],s:'H',f:['ccc'],ba:['assure'],r:'Plan a penetration test before go-live, with time to fix its findings.'},
+  {id:'vSaas',t:'tri',l:'SaaS provider has supplied a security test or certification report',c:['4-2-3'],s:'M',f:['ccc'],ba:['assure','supp'],show:isSaaS,r:'Get a penetration test summary or certification report from the SaaS provider.'}]},
+ {q:'H',n:'Security service management',fields:[
+  {id:'lSoc',t:'tri',l:'SOC monitoring of this system is planned from go-live',c:['2-12-3-4'],s:'H',ba:['mon'],r:'Plan to onboard the system to SOC monitoring before go-live.'},
+  {id:'lUse',t:'tri',l:'SIEM alert rules for this system are defined',c:['2-12-3-4'],s:'M',ba:['mon'],r:'Define the SIEM alert rules for this system (failed logins, privilege changes, mass export, admin activity out of hours).'}]},
+ {q:'P',n:'Application and user management',fields:[
+  {id:'oHand',t:'tri',l:'Handover to operations is planned (runbooks, admin accounts, contacts)',c:['1-6-2'],s:'L',ba:['gov'],r:'Plan the handover of runbooks, administrator accounts and contact lists to the operations team.'}]},
+ {q:'L',n:'Security of sites, networks and platforms',fields:[
+  {id:'cExit',t:'tri',l:'Contract covers return and deletion of data when the cloud service ends',c:['4-2-3'],s:'M',f:['ccc'],ba:['supp','conf'],show:isCloud,r:'Add contract terms for return of the data and certified deletion when the service ends.'},
+  {id:'dccDispose',t:'tri',l:'Secure deletion method is defined for this system\'s data and storage',c:['2-7-3'],s:'H',ba:['conf','comp'],show:classified,r:'Define how data, disks and backups will be securely erased or destroyed, with a certificate.'}]},
+ {q:'T',n:'Security operations schedule',fields:[
+  {id:'oGate',t:'tri',l:'Security testing and sign-off are in the project plan before the go-live date',c:['1-6-2'],s:'M',ba:['gov','assure'],r:'Add the scan, penetration test, restore test and security sign-off to the project plan with dates before go-live.'}]}
+]}
+];
+const FIELDS=[];LAYERS.forEach((L,li)=>L.cells.forEach(c=>c.fields.forEach(f=>{f.layer=li;f.q=c.q;FIELDS.push(f)})));
+const FMAP=Object.fromEntries(FIELDS.map(f=>[f.id,f]));
+const CTRL=FIELDS.filter(f=>f.c);
+const REQ=FIELDS.filter(f=>f.req);
+
+/* ============================== ARCHITECTURE VOCAB ============================== */
+const TIERS=['Presentation / web','Application','API gateway','Database','Integration / ESB','File / object storage','Identity / auth','Batch / scheduler','Mobile client','Desktop client','HMI / SCADA','Controller / PLC','Other'];
+const ZONES=['Internet','User zone','DMZ','Application zone','Database zone','Management zone','Cloud VPC / VNet','SaaS provider','OT zone'];
+/* Where the people who use the system sit: public users and partners come from the Internet, staff and administrators from the User zone */
+const ACTOR_ZONE={'Public users':'Internet','Partners / third parties':'Internet','Internal staff':'User zone','Administrators':'User zone'};
+/* Zone names used by earlier versions of the form */
+const ZONE_RENAME={'Internet / external':'Internet','User LAN':'User zone'};
+function fixZones(s){[s,s&&s.snap,s&&s.sub].forEach(x=>{if(x&&Array.isArray(x.comps))x.comps.forEach(c=>{if(ZONE_RENAME[c.zone])c.zone=ZONE_RENAME[c.zone]})});return s}
+const ZTRUST={'Internet':'Untrusted','DMZ':'Semi-trusted','Application zone':'Restricted','Database zone':'Highly restricted','User zone':'Trusted','Management zone':'Highly restricted','Cloud VPC / VNet':'Restricted','SaaS provider':'Provider-managed','OT zone':'Highly restricted'};
+const ZCTRL={'Internet':'Perimeter firewall, DDoS','DMZ':'Perimeter NGFW + WAF inbound; internal firewall outbound','Application zone':'Internal firewall; only from DMZ / API gateway','Database zone':'Internal firewall; only from application zone','User zone':'NAC, internal firewall','Management zone':'PAM jump hosts only','Cloud VPC / VNet':'Cloud firewall / security groups','SaaS provider':'Provider controls + SSO','OT zone':'Industrial DMZ'};
+const ENC=['TLS 1.3','TLS 1.2','mTLS','IPsec / VPN','SSH / SFTP','Native DB encryption','TLS 1.0 / 1.1','None','Unknown'];
+const WEAK_ENC=['TLS 1.0 / 1.1','None','Unknown'];
+const AUTH=['mTLS certificate','OAuth2 / OIDC','SAML SSO','Kerberos / AD','DB account (vaulted)','API key','Basic / username-password','None','Unknown'];
+const CLASSES=['Top Secret','Secret','Restricted','Public'];
+const ACTORS=['Public users','Internal staff','Partners / third parties','Administrators'];
+const TEMPLATES={
+ 'Web application':[['Web front end','Presentation / web','DMZ'],['Application server','Application','Application zone'],['Database','Database','Database zone']],
+ 'Mobile application + backend':[['Mobile app','Mobile client','Internet'],['API gateway','API gateway','DMZ'],['Backend services','Application','Application zone'],['Database','Database','Database zone']],
+ 'API / integration service':[['API gateway','API gateway','DMZ'],['Integration services','Integration / ESB','Application zone'],['Database','Database','Database zone']],
+ 'Commercial off-the-shelf (COTS) application':[['Application server','Application','Application zone'],['Database','Database','Database zone']],
+ 'SaaS application':[['SaaS service','Application','SaaS provider'],['Identity federation','Identity / auth','Application zone']],
+ 'Database / data platform':[['Database cluster','Database','Database zone'],['Reporting / BI','Application','Application zone']],
+ [INFRA]:[['Service nodes','Other','Application zone']],
+ 'Desktop / client-server application':[['Desktop client','Desktop client','User zone'],['Application server','Application','Application zone'],['Database','Database','Database zone']],
+ 'OT / ICS system':[['HMI / SCADA server','HMI / SCADA','OT zone'],['Controllers / PLCs','Controller / PLC','OT zone'],['Historian replica','Database','DMZ']]
+};
+const TIER_BASE={
+ 'Presentation / web':['CIS benchmark for web server (NGINX/Apache/IIS)','Directory listing, server banners and default pages removed','Security headers: HSTS, CSP, X-Content-Type-Options, frame-ancestors','Static content only; no direct database connectivity'],
+ 'Application':['CIS benchmark for OS and runtime','Runs as non-root service account; no interactive logon','Secrets read from vault at runtime','Only application ports open; admin via PAM'],
+ 'API gateway':['OAuth2 / mTLS enforced on every route','Rate limits and quotas per client','Schema validation and payload size limits','Access logs with client ID to SIEM'],
+ 'Database':['CIS benchmark for the DBMS','Default accounts removed or locked; DBA access via PAM','TDE / encryption at rest with keys in KMS/HSM','Native audit for logins, privilege changes, DDL and bulk reads','Listens only on the application zone interface'],
+ 'Integration / ESB':['Per-interface credentials; no shared service accounts','Message-level validation and logging','Encrypted connections to every endpoint'],
+ 'File / object storage':['Encryption at rest','No anonymous or public access','Access by role; versioning or immutability for critical data'],
+ 'Identity / auth':['Federation via SAML/OIDC with signed assertions','Admin roles limited and MFA-protected','Sign-in and audit logs to SIEM'],
+ 'Batch / scheduler':['Jobs run under dedicated service accounts','Job definitions under change control','Output files encrypted and access-restricted'],
+ 'Mobile client':['OWASP MASVS L1/L2 controls','Certificate pinning; no secrets in the app bundle','Root/jailbreak detection and obfuscation'],
+ 'Desktop client':['Deployed through managed software distribution','No stored credentials; SSO to backend','Connects only to the application tier over TLS'],
+ 'HMI / SCADA':['Vendor hardening guide applied','Application allow-listing','No internet or email access'],
+ 'Controller / PLC':['Firmware at vendor-supported level','Program mode locked; change via engineering workstation only','Unused services and ports disabled'],
+ 'Other':['Vendor or CIS hardening baseline','Admin via PAM only','Logs to SIEM']
+};
+const TIER_LOGS={'Presentation / web':'Access logs, errors, WAF events','Application':'Authentication, authorisation failures, admin actions, sensitive data access, errors','API gateway':'Request logs with client ID, auth failures, throttling','Database':'Logins, privilege changes, DDL, bulk/privileged queries','Integration / ESB':'Message flow, failures, endpoint auth errors','File / object storage':'Access, permission changes, deletions','Identity / auth':'Sign-ins, MFA, role changes','Batch / scheduler':'Job runs, failures, changes','Mobile client':'Backend-side session and device events','Desktop client':'Backend-side session events','HMI / SCADA':'Operator logins, setpoint changes, alarms','Controller / PLC':'Mode changes, program downloads (via OT monitoring)','Other':'Security and audit events'};
+
+/* Logical security services (SABSA) -> the questions that evidence them */
+const SERVICES=[
+ ['Identification and authentication','Entities are uniquely identified and prove who they are.',['iSso','iUnique','iMfaExt','iMfaPub','iMfaAdm','iSession','iDefault']],
+ ['Authorisation and privilege management','Access follows role and need; privileged use is brokered.',['iRbac','iPam','iSvc','iReview','iLeaver','tRemote','otRemote']],
+ ['Boundary protection and domain segregation','Domains are separated and only documented flows cross them.',['hSeg','hFw','wTier','wWaf','wApi','wDdos','wBot','hMgmt','nPorts','otSeg','otInet','otSis']],
+ ['Confidentiality and cryptography','Data is encrypted in transit and at rest with managed keys.',['wHttps','dTls','dRest','dKms','dNcs','dCert','sSecrets','kRot']],
+ ['Data protection and privacy','Data is classified, retained, masked and kept where it must be.',['gClass','dDlp','sMask','dRet','gPdpl','cKsa','cTenant','dccNeed','dccWater','dccCapture','dccMobile','dccPrint','dccDispose']],
+ ['Application and platform integrity','Code and platforms are built, hardened and patched securely.',['sThreat','sCode','sSca','sOwasp','sEnv','hHarden','hEdr','hPatch','hEol','sVendor','sMob']],
+ ['Audit and accountability','Actions are recorded, attributable and retained.',['lApp','lPriv','lInteg','dDam','lRet','hNtp']],
+ ['Monitoring and incident response','Events are detected and handled.',['lSiem','lSoc','lUse','rIr','otMon']],
+ ['Availability and recovery','The service survives failure and can be restored.',['bScope','bImm','bTest','rHa','rDr','rDrTest']],
+ ['Governance and assurance','The system is owned, risk-managed and independently tested.',['gRisk','gReq','gGolive','gRoles','gChange','gInv','gDocs','vScan','vRem','pPre','pFreq','oSched','oTrain','phDc','wPolicy','dccVet','dccAware','dccReview']],
+ ['Supplier and cloud assurance','Third parties meet the same requirements.',['dccTp','tContract','cProv','cSso','cExit','vSaas']]
+];
+SERVICES.forEach(s=>s[2]=s[2].filter(id=>FMAP[id]));
+
+/* ============================== SAMPLE DATA ============================== */
+const uid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const clone=o=>JSON.parse(JSON.stringify(o));
+function sampleSystems(){const L=[
+ {id:uid(),example:true,a:{
+  sysName:'Citizen Permits Portal (sample)',sysDesc:'Online permit applications and tracking for citizens and businesses',sysType:'Web application',dataClass:'Restricted',personal:'Yes',critical:'Yes',projName:'Digital Licensing Programme, phase 2',stage:'Design',goLive:'2027-03-01',
+  drivers:['Regulatory compliance','Service availability','Protection of sensitive data','Public trust and reputation'],threats:['Data breach or leakage','Account takeover','Service outage / DDoS','Web and API attacks'],bImpact:'Major',appetite:'Low',
+  bProc:'Permit application, fee payment, review and issuance',devModel:'Vendor-developed (custom)',exposure:'Internet-facing (public users)',
+  owner:'Director, Licensing Services',techOwner:'Head of Application Development',usersPublic:'Yes',usersStaff:'Yes',usersPartner:'No',userCount:'250000',
+  hosting:'On-premises data center',sites:'Riyadh primary DC, Jeddah DR',userGeo:'Inside the Kingdom only',svcHours:'24x7',avail:'99.9%',rto:'4',rpo:'1',
+  gClass:'Partial',gRisk:'Yes',sThreat:'No',gReq:'Partial',strat:['Defence in depth','Least privilege','Secure by design'],gGolive:'Yes',gRoles:'Yes',tContract:'Yes',hSeg:'Yes',dRet:'Partial',lRet:'12',
+  gInv:'Yes',dDlp:'No',sMask:'No',gPdpl:'Partial',wPolicy:'Yes',gDocs:'Partial',wTier:'Yes',wHttps:'Yes',sOwasp:'Partial',lApp:'Partial',
+  iSso:'Yes',iSso_p:'National SSO (public) + Entra ID (staff)',iUnique:'Yes',iRbac:'Yes',iSvc:'Partial',hFw:'Partial',iSession:'Yes',iLeaver:'Partial',
+  dRest:'Partial',bScope:'Yes',bScope_p:'Commvault',bImm:'No',sEnv:'Yes',rIr:'No',
+  wWaf:'Yes',wWaf_p:'F5 Advanced WAF',wApi:'Partial',wApi_p:'Kong Gateway',wDdos:'Yes',wBot:'Partial',dTls:'TLS 1.2',dKms:'Software key vault',sSecrets:'Partial',hEdr:'Yes',hEdr_p:'CrowdStrike Falcon',lSiem:'Yes',lSiem_p:'Splunk ES',
+  iMfaExt:'Partial',iMfaPub:'Yes',iMfaAdm:'Partial',iPam:'No',hMgmt:'No',rHa:'Yes',rDr:'Partial',lPriv:'Partial',dDam:'No',lInteg:'Yes',
+  hEol:'Yes',sSca:'No',hHarden:'Partial',dNcs:'Partial',sCode:'Partial',sVendor:'Yes',dCert:'Yes',tRemote:'Partial',iDefault:'Yes',nPorts:'Partial',hNtp:'Yes',hPatch:'Partial',
+  dccVet:'Yes',dccTp:'Partial',dccWater:'No',dccNeed:'Partial',dccCapture:'No',dccMobile:'Yes',dccPrint:'No',dccAware:'Partial',dccDispose:'Partial',
+  bTest:'No',rDrTest:'No',vScan:'Partial',vScan_p:'Tenable',pPre:'Partial',lSoc:'Yes',lUse:'No',oTrain:'Partial',oHand:'No',phDc:'Yes',oGate:'Yes'},
+  comps:[
+   {n:'Web front end',tier:'Presentation / web',tech:'NGINX 1.24 + React',zone:'DMZ',host:'10.10.10.21-22',port:'443'},
+   {n:'API gateway',tier:'API gateway',tech:'Kong Gateway 3.x',zone:'DMZ',host:'10.10.10.30',port:'443'},
+   {n:'Permits service',tier:'Application',tech:'Java 17 / Spring Boot on RHEL 9',zone:'Application zone',host:'10.30.1.15-16',port:'8443'},
+   {n:'Permits DB',tier:'Database',tech:'Oracle 19c (Data Guard)',zone:'Database zone',host:'10.30.2.10',port:'1521'},
+   {n:'Document store',tier:'File / object storage',tech:'MinIO',zone:'Database zone',host:'10.30.2.20',port:'9000'},
+   {n:'Reporting extract',tier:'Batch / scheduler',tech:'Control-M job',zone:'Application zone',host:'10.30.1.40',port:'—'}],
+  ifs:[
+   {from:'Public users',to:'Web front end',proto:'HTTPS',port:'443',cls:'Restricted',enc:'TLS 1.2',auth:'OAuth2 / OIDC'},
+   {from:'Web front end',to:'API gateway',proto:'HTTPS',port:'443',cls:'Restricted',enc:'TLS 1.2',auth:'OAuth2 / OIDC'},
+   {from:'API gateway',to:'Permits service',proto:'HTTPS',port:'8443',cls:'Restricted',enc:'mTLS',auth:'mTLS certificate'},
+   {from:'Permits service',to:'Permits DB',proto:'Oracle Net',port:'1521',cls:'Restricted',enc:'Native DB encryption',auth:'DB account (vaulted)'},
+   {from:'Permits service',to:'Document store',proto:'HTTPS (S3)',port:'9000',cls:'Restricted',enc:'TLS 1.2',auth:'API key'},
+   {from:'Permits service',to:'SMS gateway provider',proto:'HTTPS',port:'443',cls:'Restricted',enc:'TLS 1.2',auth:'API key'},
+   {from:'Reporting extract',to:'Legacy HR system',proto:'HTTP',port:'80',cls:'Restricted',enc:'None',auth:'Basic / username-password'},
+   {from:'Internal staff',to:'Web front end',proto:'HTTPS',port:'443',cls:'Restricted',enc:'TLS 1.2',auth:'SAML SSO'},
+   {from:'Administrators',to:'Permits service',proto:'SSH',port:'22',cls:'Restricted',enc:'SSH / SFTP',auth:'Kerberos / AD'}],
+  plan:{}}
+];L.forEach(s=>{s.snap=clone({a:s.a,comps:s.comps,ifs:s.ifs});s.genAt=new Date().toISOString()});return L}
+function blankSystem(){return{id:uid(),example:false,a:{},comps:[],ifs:[],plan:{}}}
+
+/* ============================== STATE ============================== */
+const KEY='nca-sabsa-v1';
+let S;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!Array.isArray(S.systems)||!S.systems.length)S={systems:sampleSystems(),cur:0};
+/* v3 reworded the questions for design review before implementation: refresh stored sample systems, keep the user's own */
+if(S.v!==3){const own=S.systems.filter(s=>!s.example);S.systems=S.systems.some(s=>s.example)?[...sampleSystems(),...own]:own;S.cur=0;S.v=3}
+S.systems.forEach(s=>{s.a=s.a||{};s.comps=s.comps||[];s.ifs=s.ifs||[];s.plan=s.plan||{};fixZones(s)});
+if(!(S.cur>=0&&S.cur<S.systems.length))S.cur=0;
+let UI={tab:'form',sev:'all',lay:'all',err:false};
+try{const u=JSON.parse(localStorage.getItem(KEY+'-ui'));if(u)UI=Object.assign(UI,u,{err:false})}catch(e){}
+const TABKEYS=['form','hld','lld','threat','gaps','review','export'];
+const h0=(location.hash||'').slice(1);if(TABKEYS.includes(h0))UI.tab=h0;
+/* save() keeps a copy in this browser (a cache, and the only store when the shared one is unavailable); saveData() also sends the change to the shared store */
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));localStorage.setItem(KEY+'-ui',JSON.stringify(UI))}catch(e){}}
+const sys=()=>S.systems[S.cur];
+let SNAP=false; /* true while rendering outputs: read the generated snapshot, not the live form */
+let CTX=null;   /* set while a reviewer has someone's submitted design open: {uid,id,doc,view,rev} */
+const cur=()=>CTX?CTX.view:(SNAP&&sys().snap?sys().snap:sys());
+const meta=()=>CTX?{genAt:CTX.doc.sub.at,plan:CTX.doc.plan||{}}:sys();
+const A=()=>cur().a;
+function withSnap(fn){const p=SNAP;SNAP=true;try{return fn()}finally{SNAP=p}}
+const liveData=()=>({a:sys().a,comps:sys().comps,ifs:sys().ifs});
+const isDirty=()=>!!sys().snap&&JSON.stringify(liveData())!==JSON.stringify(sys().snap);
+
+/* ============================== ENGINE ============================== */
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lc=s=>String(s||'').trim().toLowerCase();
+const val=id=>{const v=A()[id];return Array.isArray(v)?v.join(', '):(v||'')};
+const prod=id=>A()[id+'_p']||'';
+const shown=f=>!f.show||f.show(A());
+function statusOf(f){
+ const a=A();
+ if(!shown(f))return 'na';
+ const v=a[f.id];
+ if(v===undefined||v===''||(Array.isArray(v)&&!v.length))return f.c?'open':'info';
+ if(f.ev)return f.ev(v,a)||'open';
+ if(f.t==='tri'){const m=TRI.find(x=>x[0]===v);return m?m[1]:'open'}
+ if(f.t==='sel'&&Array.isArray(f.o[0])){const m=f.o.find(x=>x[0]===v);return m?m[1]:'open'}
+ return 'info';
+}
+const sub=ref=>ref.split('-').slice(0,2).join('-');
+const compByName=n=>cur().comps.find(c=>lc(c.n)===lc(n));
+const isActor=n=>ACTORS.some(x=>lc(x)===lc(n));
+function baPri(k){
+ const a=A(),v=a['ba_'+k];if(v)return v;
+ const d={conf:classified(a)?'High':'Medium',priv:a.personal==='Yes'?'High':'Low',avail:(a.critical==='Yes'||['99.99%','99.9%'].includes(a.avail))?'High':'Medium',recov:a.critical==='Yes'?'High':'Medium',comp:'High',auth:'High',access:'High',supp:(vendor(a)||isCloud(a))?'Medium':'Low'};
+ return d[k]||'Medium';
+}
+function dynItems(){
+ const sy=cur(),out=[];
+ if(!sy.comps.length)out.push({key:'d-nocomp',title:'System components not documented',refs:['2-1-3'],s:'M',st:'open',layer:2,q:'L',ba:['gov'],rec:'List every component of the system (tier, technology, zone, host) in the Logical layer of the form.'});
+ sy.comps.forEach((c,i)=>{
+  if(['Database','File / object storage'].includes(c.tier)&&['DMZ','Internet'].includes(c.zone))
+   out.push({key:'d-cz-'+i,title:`${c.n}: data tier placed in ${c.zone}`,refs:['2-15-3-2','2-5-3-1'],flags:['ccc'],s:'C',st:'gap',layer:3,q:'L',ba:['prot','conf'],rec:`Move ${c.n} into the database zone behind the internal firewall.`});
+  else if(c.tier==='Application'&&c.zone==='DMZ')
+   out.push({key:'d-cz-'+i,title:`${c.n}: application tier placed in the DMZ`,refs:['2-15-3-2'],s:'M',st:'partial',layer:3,q:'L',ba:['prot'],rec:`Move ${c.n} to the application zone and keep only reverse proxies / web servers in the DMZ.`});
+ });
+ sy.ifs.forEach((f,i)=>{
+  if(!f.from&&!f.to)return;
+  const lbl=`${f.from||'?'} → ${f.to||'?'}`,sens=f.cls&&f.cls!=='Public',ext=!(compByName(f.from)&&compByName(f.to)),weak=WEAK_ENC.includes(f.enc);
+  if(f.enc){let st='met',s='H';if(weak){st=sens?'gap':'partial';s=sens?((ext||['Secret','Top Secret'].includes(f.cls))?'C':'H'):'M'}
+   out.push({key:'d-ie-'+i,title:`Interface ${lbl}: encryption in transit (${f.enc})`,refs:['2-8-3'],flags:['dcc','ccc'],s,st,layer:3,q:'H',ba:['conf','integ'],rec:`Encrypt ${lbl} with TLS 1.2+ (mTLS for system-to-system) or IPsec.`,ans:f.enc})}
+  if(f.auth){let st='met',s='H';if(f.auth==='None'||f.auth==='Unknown'){st='gap';s=sens?'H':'M'}else if(['Basic / username-password','API key'].includes(f.auth)&&(ext||sens)){st='partial';s='M'}
+   out.push({key:'d-ia-'+i,title:`Interface ${lbl}: authentication (${f.auth})`,refs:['2-2-3-1'],flags:['ccc'],s,st,layer:3,q:'P',ba:['auth'],rec:`Authenticate ${lbl} with mTLS or OAuth2 client credentials; vault and rotate any secrets.`,ans:f.auth})}
+ });
+ return out;
+}
+function allItems(){
+ return CTRL.map(f=>({key:f.id,title:f.l,refs:f.c,flags:f.f||[],s:f.s,rec:f.r,st:statusOf(f),ans:val(f.id),layer:f.layer,q:f.q,ba:f.ba||[],dcc:DCCMAP[f.id]||[]}))
+  .concat(dynItems().map(d=>Object.assign({flags:[],ans:'From components and interfaces',dcc:d.key.startsWith('d-ie')?['2-5']:d.key.startsWith('d-ia')?['2-1']:[]},d)));
+}
+function dccStats(id,items){const its=items.filter(x=>x.dcc.includes(id));return{items:its,gaps:its.filter(x=>x.st==='gap').length,score:score(its),st:roll(its)}}
+function companions(it){
+ const a=A(),subs=[...new Set(it.refs.map(sub))],out=[],fl=it.flags||[];
+ if(a.critical==='Yes')subs.forEach(s=>out.push('CSCC '+s));
+ if(isCloud(a)&&fl.includes('ccc'))subs.forEach(s=>out.push('CCC '+s));
+ if(isOT(a)&&fl.includes('ot'))subs.forEach(s=>out.push('OTCC '+s));
+ if(classified(a))(it.dcc||DCCMAP[it.key]||[]).forEach(s=>out.push('DCC '+s));
+ return out;
+}
+const PR={High:0,Medium:1,Low:2,'Not relevant':3};
+/* Every control this system is required to have. Those not yet in the design come first: missing, partly, unanswered, then the ones already included. */
+function required(items){
+ items=items||allItems();
+ const ord={C:0,H:1,M:2,L:3},so={gap:0,partial:1,open:2,met:3};
+ return items.filter(x=>x.st!=='na').map(x=>Object.assign({},x,{sev:x.s,bp:Math.min(3,...x.ba.map(k=>PR[baPri(k)]??1))}))
+  .sort((p,q)=>so[p.st]-so[q.st]||ord[p.sev]-ord[q.sev]||p.bp-q.bp);
+}
+/* The required controls that are not yet fully in the design */
+function findings(items){return required(items).filter(x=>x.st!=='met')}
+function score(items){
+ let w=0,got=0;items.forEach(x=>{if(['met','partial','gap'].includes(x.st)){const k=SEV[x.s].w;w+=k;got+=x.st==='met'?k:x.st==='partial'?k/2:0}});
+ return w?Math.round(got/w*100):null;
+}
+function roll(its){
+ const live=its.filter(i=>i.st!=='na');
+ if(!live.length)return 'na';
+ if(live.some(i=>i.st==='gap'))return 'gap';
+ if(live.some(i=>i.st==='partial'||i.st==='open'))return live.every(i=>i.st==='open')?'open':'partial';
+ return 'met';
+}
+function subStats(id,items){const its=items.filter(x=>x.refs.some(r=>sub(r)===id));return{items:its,assessed:its.filter(x=>['met','partial','gap'].includes(x.st)).length,gaps:its.filter(x=>x.st==='gap').length,score:score(its),st:roll(its)}}
+const ST_LABEL={met:'In the design',partial:'Partly',gap:'Missing',open:'Not answered',na:'Not applicable',info:'',doc:'Documented'};
+const frameworksOn=()=>FRAMEWORKS.filter(f=>f.on(A()));
+const sysLabel=()=>A().sysName||'Untitled system';
+function cellStatus(li,cell,items){
+ const its=items.filter(i=>i.layer===li&&i.q===cell.q);
+ if(its.some(i=>i.st!=='na'))return{st:roll(its),n:its.filter(i=>i.st!=='na').length,ok:its.filter(i=>i.st==='met').length};
+ const info=cell.fields.filter(f=>!f.c&&shown(f));
+ if(!info.length)return{st:'na',n:0,ok:0};
+ const filled=info.filter(f=>statusOf(f)==='info'&&val(f.id)!=='').length;
+ return{st:filled===info.length?'doc':filled?'partial':'open',n:info.length,ok:filled,info:true};
+}
+
+/* ============================== SHELL ============================== */
+const OUTPUTS=[['hld','HLD'],['lld','LLD'],['threat','Threat model'],['gaps','Required controls']];
+function tabList(){
+ if(CTX)return[...OUTPUTS,['review','Review decision']];
+ const t=[['form','Form'],...OUTPUTS,['review','Review']];
+ if(CLOUD&&CLOUD.reviewer)t.push(['queue','Review queue']);
+ t.push(['export','Export & systems']);
+ return t;
+}
+function renderShell(){
+ const has=!!CTX||!!sys().snap;
+ const r=has?withSnap(()=>{const it=allItems(),f=findings(it),g=f.filter(x=>x.st!=='open');return{sc:score(it),g:g.length,c:g.filter(x=>x.sev==='C').length,h:g.filter(x=>x.sev==='H').length,t:threats().filter(x=>x.st==='gap'||x.st==='partial').length}}):null;
+ const waiting=QUEUE.filter(q=>rstate({version:q.version},(RIDX[q.uid]||{})[q.id]).k==='submitted').length;
+ const count={gaps:r?r.g:null,threat:r?r.t:null,queue:waiting||null};
+ document.getElementById('tabs').innerHTML=tabList().map(([k,n])=>`<button role="tab" data-tab="${k}" aria-selected="${UI.tab===k}">${n}${count[k]!=null?`<span class="count">${count[k]}</span>`:''}</button>`).join('');
+ const sel=document.getElementById('sysSel');
+ sel.disabled=!!CTX;
+ if(CTX)sel.innerHTML=`<option>${esc(sysLabel())}</option>`;
+ else if(document.activeElement!==sel)sel.innerHTML=S.systems.map((s,i)=>`<option value="${i}" ${i===S.cur?'selected':''}>${esc(s.a.sysName||'Untitled system')}</option>`).join('');
+ document.getElementById('kpis').innerHTML=(r?`<span class="kpi">Compliance <b>${r.sc==null?'–':r.sc+'%'}</b></span><span class="kpi c">Critical <b>${r.c}</b></span><span class="kpi h">High <b>${r.h}</b></span>`:`<span class="kpi">HLD and LLD <b>not generated</b></span>`)+`<span class="kpi" id="sync">${SYNC_LABEL[SYNC]}</span>`+(r?'<button class="btn sm" data-act="pdf">Export PDF</button>':'');
+ let b='';
+ if(CTX)b+=`<div class="banner"><p><b>You are reviewing ${esc(sysLabel())}, version ${CTX.doc.sub.version}.</b> Submitted by <span data-uid="${esc(CTX.uid)}">a colleague</span> on ${esc(String(CTX.doc.sub.at).slice(0,10))}. Add comments on each document, then record your decision.</p><button class="btn" data-act="closerv">Back to the review queue</button></div>`;
+ else{
+  const s=sys(),st=rstate(s.sub,REV[s.id]);
+  if(s.example)b+=`<div class="banner"><p><b>Sample system.</b> Fictional answers so you can see the form and its outputs. Start your own with a blank form.</p><button class="btn primary" data-act="newsys">Start a blank form</button></div>`;
+  if(CLOUD&&CLOUD.readonly)b+=`<div class="banner warn"><p><b>You have view-only access.</b> Your work is kept in this browser only and cannot be submitted. Ask the page owner for Contributor access.</p></div>`;
+  if(['returned','rejected','conditions'].includes(st.k)&&UI.tab!=='review')b+=`<div class="banner warn"><p><b>Cybersecurity decision on version ${s.sub.version}: ${st.l}.</b> Read the comments, update the form and submit a new version.</p><button class="btn primary" data-tab="review">See the review</button></div>`;
+  if(!['form','review','queue','export'].includes(UI.tab)&&isDirty())b+=`<div class="banner warn"><p><b>The form has changed since these documents were generated.</b> Generate again to bring the HLD, LLD, threat model and required controls up to date.</p><button class="btn primary" data-act="generate">Generate again</button></div>`;
+ }
+ document.getElementById('banner').innerHTML=b;
+ document.getElementById('endpoints').innerHTML=[...ACTORS,...sys().comps.map(c=>c.n)].filter(Boolean).map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+function render(){
+ if(!tabList().some(t=>t[0]===UI.tab))UI.tab=CTX?'hld':'form';
+ renderShell();
+ const m=document.getElementById('main'),out={hld:renderHLD,lld:renderLLD,threat:renderThreat,gaps:renderControls};
+ if(CTX)(out[UI.tab]||renderReview)(m);
+ else if(UI.tab==='form')renderForm(m);
+ else if(UI.tab==='export')renderExport(m);
+ else if(UI.tab==='review')renderReview(m);
+ else if(UI.tab==='queue')renderQueue(m);
+ else if(!sys().snap)m.innerHTML=`<div class="empty big"><h2>Nothing generated yet</h2><p>Complete the form, then select <b>Generate HLD and LLD</b>.</p><button class="btn primary big" data-tab="form">Go to the form</button></div>`;
+ else withSnap(()=>out[UI.tab](m));
+ fillNames();
+}
+
+/* ============================== FORM ============================== */
+function formProgress(){const fs=CTRL.filter(shown);return{n:fs.length,done:fs.filter(f=>statusOf(f)!=='open').length}}
+function layerProgress(L,li){
+ const fs=CTRL.filter(f=>f.layer===li&&shown(f)),st=fs.map(statusOf);
+ if(!fs.length){const inf=FIELDS.filter(f=>f.layer===li&&!f.c&&shown(f));return{label:inf.filter(f=>val(f.id)!=='').length+'/'+inf.length,cls:''}}
+ const done=st.filter(x=>x!=='open').length;
+ return{label:done+'/'+fs.length,cls:st.includes('gap')?'crit':st.includes('partial')?'warn':done===fs.length?'ok':''};
+}
+function missingReq(){return REQ.filter(f=>!sys().a[f.id])}
+function renderForm(m){
+ const pg=formProgress(),miss=UI.err?missingReq():[];
+ m.innerHTML=`<form id="frm" novalidate><div class="assess"><nav class="rail" aria-label="SABSA layers"><div class="eyebrow">SABSA layers</div>${LAYERS.map((L,i)=>{const p=layerProgress(L,i);
+  return `<button type="button" data-jump="L${i}"><span class="dot ${p.cls}"></span><span class="nm">${L.n}<small>${L.view}</small></span><span class="prog">${p.label}</span></button>`}).join('')}</nav>
+ <div class="layers">
+ <div class="banner" style="margin:0"><p><b>Fill this in before the system is built.</b> Answer for the design you intend to implement: <b>Yes</b> means the design includes it, <b>Partial</b> means partly, <b>No</b> means it is not in the design, <b>N/A</b> means it does not apply. The form generates the HLD and LLD, which you then submit to cybersecurity for review.</p></div>
+ ${miss.length?`<div class="banner err" id="errbox" style="margin:0"><p><b>Complete these before generating:</b> ${miss.map(f=>esc(f.l)).join(', ')}. They decide which controls and frameworks apply.</p></div>`:''}
+ ${LAYERS.map((L,i)=>`<section class="sect" id="L${i}"><div class="sect-h"><div class="eyebrow">Layer ${i+1} of 6 · ${L.view}</div><h2>${L.n} security architecture</h2><p>${L.p}</p></div>
+  ${L.cells.map(c=>cellHTML(c)).join('')}</section>`).join('')}
+ <div class="submitbar"><div class="pg"><b>${pg.done} of ${pg.n}</b> control questions answered. Unanswered questions are shown to the reviewer as not answered.<div class="bar"><i style="width:${pg.n?pg.done/pg.n*100:0}%"></i></div></div>
+  <button type="submit" class="btn primary big">Generate HLD and LLD</button></div>
+ </div></div></form>`;
+}
+function cellHTML(c){
+ const vis=c.fields.filter(shown);
+ let body=vis.map(qHTML).join('');
+ if(c.special==='bap')body=bapHTML()+body;
+ if(c.special==='arch')body=archHTML()+body;
+ if(!body)body=`<div class="q"><div class="muted">Nothing in this cell applies to this system type.</div></div>`;
+ return `<div class="cell-h"><span class="qw">${QN[c.q][0]}</span><h3>${c.n}</h3><span class="d">${QN[c.q][1]}</span></div><div>${body}</div>`;
+}
+function qHTML(f){
+ const a=A(),st=statusOf(f),v=a[f.id]??'';
+ let ctl='';
+ if(f.t==='tri')ctl=`<div class="seg" role="group" aria-label="${esc(f.l)}">${TRI.map(([l,s])=>`<button type="button" data-f="${f.id}" data-v="${l}" data-s="${s}" aria-pressed="${v===l}">${l}</button>`).join('')}</div>`;
+ else if(f.t==='yn')ctl=`<div class="seg" role="group" aria-label="${esc(f.l)}">${['Yes','No'].map(l=>`<button type="button" data-f="${f.id}" data-v="${l}" data-s="info" aria-pressed="${v===l}">${l}</button>`).join('')}</div>`;
+ else if(f.t==='multi'){const arr=Array.isArray(v)?v:[];ctl=`<div class="multi" role="group" aria-label="${esc(f.l)}">${f.o.map(o=>`<button type="button" data-m="${f.id}" data-v="${esc(o)}" aria-pressed="${arr.includes(o)}">${esc(o)}</button>`).join('')}</div>`}
+ else if(f.t==='sel'){const opts=f.o.map(o=>Array.isArray(o)?o[0]:o);ctl=`<select class="inp" id="q-${f.id}" data-f="${f.id}"><option value="">Select…</option>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`}
+ else ctl=`<input class="inp" id="q-${f.id}" data-f="${f.id}" type="${f.t==='num'?'number':'text'}" ${f.t==='num'?'min="0"':''} value="${esc(v)}">`;
+ if(f.p)ctl+=`<input class="inp sm" id="q-${f.id}_p" data-f="${f.id}_p" placeholder="${esc(f.p)}" value="${esc(a[f.id+'_p']||'')}" aria-label="${esc(f.p)}">`;
+ const refs=f.c?`<div class="refs">${f.c.map(r=>`<span class="ref sev-${f.s}">ECC ${r}</span>`).join('')}${companions({key:f.id,refs:f.c,flags:f.f||[]}).map(r=>`<span class="ref">${r}</span>`).join('')}${(f.ba||[]).map(k=>`<span class="ref ba">${BA[k][0]}</span>`).join('')}</div>`:'';
+ const missing=UI.err&&f.req&&!v;
+ return `<div class="q st-${st}${missing?' miss':''}" id="row-${f.id}"><div><div class="lab"><label for="q-${f.id}">${esc(f.l)}</label>${f.req?' <span class="rq" title="Required">*</span>':''}</div>${f.h?`<div class="help">${esc(f.h)}</div>`:''}${refs}</div><div class="ctl">${ctl}</div></div>`;
+}
+const opt=(list,v)=>list.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
+function bapHTML(){
+ return `<div class="blk"><h4>Business attributes and their priority</h4><p class="help">SABSA traces every control back to a business attribute. Set how much each attribute matters for this system; defaults are suggested from the contextual answers. Gaps are ranked by the priority of the attributes they put at risk.</p>
+ <div class="tbl-wrap bapt"><table><thead><tr><th>Attribute</th><th>Meaning for this system</th><th>Priority</th></tr></thead><tbody>
+ ${Object.entries(BA).map(([k,[n,d]])=>`<tr><td><b>${n}</b></td><td>${d}</td><td><select id="ba-${k}" data-f="ba_${k}" aria-label="${n} priority">${opt(['High','Medium','Low','Not relevant'],baPri(k))}</select></td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+function archHTML(){
+ const sy=sys(),a=A();
+ return `<div class="blk"><h4>Components</h4><p class="help">Every server, service, database, gateway or client that makes up the system, and the security zone it sits in. Users are placed for you: public users and partners in the Internet, internal staff and administrators in the User zone.</p>
+ ${sy.comps.length?`<div class="tbl-wrap et"><table><thead><tr><th>Name</th><th>Tier</th><th>Technology / product</th><th>Zone</th><th>Host / IP</th><th>Port</th><th></th></tr></thead><tbody>
+ ${sy.comps.map((c,i)=>`<tr><td><input id="c-n-${i}" data-ct="comps" data-i="${i}" data-k="n" value="${esc(c.n)}" aria-label="Name"></td><td><select id="c-t-${i}" data-ct="comps" data-i="${i}" data-k="tier" aria-label="Tier">${opt(TIERS,c.tier)}</select></td><td><input id="c-x-${i}" data-ct="comps" data-i="${i}" data-k="tech" value="${esc(c.tech)}" aria-label="Technology"></td><td><select id="c-z-${i}" data-ct="comps" data-i="${i}" data-k="zone" aria-label="Zone">${opt(ZONES,c.zone)}</select></td><td><input id="c-h-${i}" data-ct="comps" data-i="${i}" data-k="host" value="${esc(c.host)}" class="mono" aria-label="Host"></td><td><input id="c-p-${i}" data-ct="comps" data-i="${i}" data-k="port" value="${esc(c.port)}" class="w-s mono" aria-label="Port"></td><td><button type="button" class="btn sm danger" data-rdel="comps:${i}">Remove</button></td></tr>`).join('')}
+ </tbody></table></div>`:`<div class="empty">No components yet.</div>`}
+ <div class="acts"><button type="button" class="btn" data-act="addcomp">Add component</button>${a.sysType?`<button type="button" class="btn" data-act="seed">Add typical components for ${esc(a.sysType)}</button>`:''}</div></div>
+ <div class="blk"><h4>Interfaces and data flows</h4><p class="help">Who or what connects to what. Pick a user group, a component, or type the name of an external system. Weak encryption or authentication on classified data is raised as a gap.</p>
+ ${sy.ifs.length?`<div class="tbl-wrap et"><table><thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Port</th><th>Data class</th><th>Encryption</th><th>Authentication</th><th></th></tr></thead><tbody>
+ ${sy.ifs.map((f,i)=>`<tr><td><input id="i-f-${i}" list="endpoints" data-ct="ifs" data-i="${i}" data-k="from" value="${esc(f.from)}" aria-label="From"></td><td><input id="i-t-${i}" list="endpoints" data-ct="ifs" data-i="${i}" data-k="to" value="${esc(f.to)}" aria-label="To"></td><td><input id="i-p-${i}" data-ct="ifs" data-i="${i}" data-k="proto" value="${esc(f.proto)}" aria-label="Protocol"></td><td><input id="i-o-${i}" data-ct="ifs" data-i="${i}" data-k="port" value="${esc(f.port)}" class="w-s mono" aria-label="Port"></td><td><select id="i-c-${i}" data-ct="ifs" data-i="${i}" data-k="cls" aria-label="Data class">${opt(CLASSES,f.cls)}</select></td><td><select id="i-e-${i}" data-ct="ifs" data-i="${i}" data-k="enc" aria-label="Encryption">${opt(ENC,f.enc)}</select></td><td><select id="i-a-${i}" data-ct="ifs" data-i="${i}" data-k="auth" aria-label="Authentication">${opt(AUTH,f.auth)}</select></td><td><button type="button" class="btn sm danger" data-rdel="ifs:${i}">Remove</button></td></tr>`).join('')}
+ </tbody></table></div>`:`<div class="empty">No interfaces yet.</div>`}
+ <div class="acts"><button type="button" class="btn" data-act="addif">Add interface</button></div></div>`;
+}
+function generate(){
+ const miss=missingReq();
+ if(miss.length){UI.err=true;UI.tab='form';render();const e=document.getElementById('errbox');if(e)e.scrollIntoView({block:'center'});toast('Complete the required fields first');return}
+ UI.err=false;const s=sys();s.snap=clone(liveData());s.genAt=new Date().toISOString();saveData(s);setTab('hld');
+ toast(s.example||!CLOUD?'HLD and LLD generated':'HLD and LLD generated. Submit them from the Review tab when ready.');
+}
+
+/* ============================== OUTPUT HELPERS ============================== */
+function trunc(s,n){s=String(s||'');return s.length>n?s.slice(0,n-1)+'…':s}
+function chipSVG(x,y,w,label,st,p){
+ const hh=p?36:26;
+ return `<g><title>${esc(label)}: ${ST_LABEL[st]}${p?' ('+esc(p)+')':''}</title><rect class="chip ${st}" x="${x}" y="${y}" width="${w}" height="${hh}" rx="4"/><text class="cn" x="${x+8}" y="${y+16}">${esc(trunc(label,Math.floor(w/7)))}</text>${p?`<text class="cp" x="${x+8}" y="${y+29}">${esc(trunc(p,Math.floor(w/6.2)))}</text>`:''}</g>`;
+}
+function badComp(c){return(['Database','File / object storage'].includes(c.tier)&&['DMZ','Internet'].includes(c.zone))||(c.tier==='Application'&&c.zone==='DMZ')}
+function diagramSVG(){
+ const a=A(),sy=cur(),nodes={},actors=actorList();
+ const ext=[];sy.ifs.forEach(f=>[f.from,f.to].forEach(e=>{if(e&&e.trim()&&!compByName(e)&&!isActor(e)&&!ext.some(x=>lc(x)===lc(e)))ext.push(e.trim())}));
+ const entry=[['DDoS protection','wDdos'],['WAF','wWaf'],['API gateway','wApi'],['Identity / SSO','iSso'],[inet(a)?'MFA (remote access)':'MFA (admins)',inet(a)?'iMfaExt':'iMfaAdm'],['PAM (admins)','iPam']].map(([n,f])=>({n,f,st:statusOf(FMAP[f])})).filter(x=>x.st!=='na');
+ /* the two zones people connect from are stacked on the left, each holding its user groups and any components placed there */
+ const LEFT=['Internet','User zone'];
+ const left=LEFT.map(z=>({z,who:actors.filter(n=>ACTOR_ZONE[n]===z),comps:sy.comps.filter(c=>c.zone===z)})).filter(g=>g.who.length||g.comps.length);
+ const zones=ZONES.filter(z=>!LEFT.includes(z)&&sy.comps.some(c=>c.zone===z));
+ const RH=46,top=58,colA={x:14,w:180},colE={x:218,w:170};
+ let x=418;const colZ=zones.map(z=>{const c={z,x,w:200};x+=224;return c});
+ const colX={x:Math.max(x,418),w:170};
+ const W=Math.max(colX.x+(ext.length?colX.w+20:0),1000);
+ const maxZ=Math.max(0,...zones.map(z=>sy.comps.filter(c=>c.zone===z).length));
+ const boxH=g=>32+(g.who.length+g.comps.length)*RH,leftH=left.reduce((h,g)=>h+boxH(g)+12,-12);
+ const rows=Math.max(entry.length,maxZ+0.8,ext.length,3),bodyH=Math.max(rows*RH+20,leftH),supY=top+bodyH+20,H=supY+110;
+ const compSVG=(k,xx,y,w)=>{nodes[lc(k.n)]={x:xx,y,w,h:38};return `<g><title>${esc(k.n)} · ${esc(k.tier)} · ${esc(k.tech||'')}${badComp(k)?' · wrong zone for this tier':''}</title><rect class="comp${badComp(k)?' badc':''}" x="${xx}" y="${y}" width="${w}" height="38" rx="4"/><text class="cn" x="${xx+8}" y="${y+16}">${esc(trunc(k.n,Math.floor(w/7)))}</text><text class="cp" x="${xx+8}" y="${y+30}">${esc(trunc(k.tech||k.tier,Math.floor(w/6.2)))}</text></g>`};
+ let o=`<svg viewBox="0 0 ${W} ${H}" width="${W}" style="min-width:${W}px;width:100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Security domain model and logical architecture"><defs>
+ <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+ <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ahw"/></marker></defs>`;
+ const head=(c,t)=>`<text class="collab" x="${c.x}" y="${top-14}">${t}</text>`;
+ o+=head(colA,'WHERE PEOPLE CONNECT FROM')+head(colE,'ENTRY SERVICES');if(ext.length)o+=head(colX,'EXTERNAL DOMAINS');
+ let ns='';
+ const zoneBox=(z,bx,by,w,h)=>`<rect class="zone" x="${bx}" y="${by}" width="${w}" height="${h}" rx="6"/><text class="zonelab" x="${bx+10}" y="${by+18}">${esc(z)}</text><text class="cp" x="${bx+w-10}" y="${by+18}" text-anchor="end">${esc(ZTRUST[z]||'')}</text>`;
+ colZ.forEach(c=>{
+  ns+=zoneBox(c.z,c.x,top-6,c.w,bodyH);
+  sy.comps.filter(k=>k.zone===c.z).forEach((k,j)=>{ns+=compSVG(k,c.x+8,top+24+j*RH,c.w-16)});
+ });
+ if(!zones.length)ns+=`<text x="418" y="${top+30}" class="cp">No system components were entered in the form.</text>`;
+ let by=top-6;
+ left.forEach(g=>{
+  const h=boxH(g),xx=colA.x+8,w=colA.w-16;
+  ns+=zoneBox(g.z,colA.x,by,colA.w,h);
+  g.who.forEach((n,j)=>{const y=by+30+j*RH;nodes[lc(n)]={x:xx,y,w,h:36};ns+=`<rect class="actor" x="${xx}" y="${y}" width="${w}" height="36" rx="18"/><text x="${xx+w/2}" y="${y+22}" text-anchor="middle" style="font-size:12px;font-weight:600">${esc(n)}</text>`});
+  g.comps.forEach((k,j)=>{ns+=compSVG(k,xx,by+30+(g.who.length+j)*RH,w)});
+  by+=h+12;
+ });
+ entry.forEach((c,i)=>{ns+=chipSVG(colE.x,top+i*RH,colE.w,c.n,c.st,prod(c.f))});
+ ext.forEach((n,i)=>{const y=top+i*RH;nodes[lc(n)]={x:colX.x,y,w:colX.w,h:36};ns+=`<rect class="xsys" x="${colX.x}" y="${y}" width="${colX.w}" height="36" rx="4"/><text x="${colX.x+10}" y="${y+22}" style="font-size:12px;font-weight:600">${esc(trunc(n,22))}</text>`});
+ let fl='';
+ sy.ifs.forEach(f=>{
+  const s=nodes[lc(f.from)],t=nodes[lc(f.to)];if(!s||!t)return;
+  const weak=WEAK_ENC.includes(f.enc)&&f.cls!=='Public';
+  let x1,x2,c1,c2,same=false;const y1=s.y+s.h/2,y2=t.y+t.h/2;
+  if(s.x+s.w<t.x){x1=s.x+s.w;x2=t.x;c1=c2=(x1+x2)/2}
+  else if(t.x+t.w<s.x){x1=s.x;x2=t.x+t.w;c1=c2=(x1+x2)/2}
+  else{same=true;x1=s.x+s.w;x2=t.x+t.w;c1=x1+36;c2=x2+36}
+  fl+=`<path class="flow${weak?' weak':''}" d="M${x1} ${y1} C${c1} ${y1}, ${c2} ${y2}, ${x2} ${y2}" marker-end="url(#${weak?'arw':'ar'})"/><text class="fl${weak?' weak':''}" x="${same?x1+28:(x1+x2)/2}" y="${(y1+y2)/2-3}" text-anchor="middle">${esc(trunc((f.proto||'')+(f.port?' '+f.port:''),16))}</text>`;
+ });
+ o+=fl+ns;
+ const sup=[['SIEM / SOC','lSiem'],['Backup','bScope'],['Key management','dKms'],['EDR','hEdr'],['Vuln scanning','vScan'],['DB activity monitoring','dDam']].map(([n,f])=>({n,f,st:statusOf(FMAP[f])})).filter(x=>x.st!=='na');
+ o+=`<rect class="band" x="10" y="${supY}" width="${W-20}" height="62" rx="6"/><text class="collab" x="22" y="${supY+36}">SUPPORTING SECURITY SERVICES</text>`;
+ const sw=Math.min(170,(W-260-(sup.length-1)*10)/Math.max(sup.length,1));
+ sup.forEach((c,i)=>o+=chipSVG(240+i*(sw+10),supY+12,sw,c.n,c.st,prod(c.f)));
+ o+=`<text class="cp" x="20" y="${H-14}">${esc(sysLabel())} · generated ${(meta().genAt||'').slice(0,10)}</text></svg>`;
+ return o;
+}
+function docHead(title,code){
+ return `<div class="doc-h"><div><div class="mono" style="font-size:11.5px;color:var(--muted);letter-spacing:.06em">${code}</div><h2>${esc(sysLabel())}</h2><div class="muted">${title}</div></div><div class="doc-meta"><span>Owner</span><span>${esc(val('owner')||'—')}</span><span>Frameworks</span><span>SABSA · ${frameworksOn().map(f=>f.n).join(', ')}</span><span>Generated</span><span>${(meta().genAt||'').slice(0,16).replace('T',' ')}</span><span>Review</span><span>${docReview().l}</span></div></div>`;
+}
+function svcStatus(ids){return roll(ids.map(id=>({st:statusOf(FMAP[id])})))}
+function bapRows(items){
+ return Object.entries(BA).map(([k,[n,d,m]])=>{const its=items.filter(i=>i.ba.includes(k)&&i.st!=='na');return{k,n,d,m,pri:baPri(k),n_:its.length,gaps:its.filter(i=>i.st==='gap').length,sc:score(its),st:roll(its)}})
+  .filter(r=>r.pri!=='Not relevant').sort((p,q)=>PR[p.pri]-PR[q.pri]);
+}
+function objectives(){
+ const O={conf:'Prevent disclosure of classified data in storage, in transit and on export.',integ:'Prevent and detect unauthorised change to data, code and configuration.',avail:'Keep the service within its availability target under failure and attack.',access:'Grant, review and revoke access by role and business need.',auth:'Strongly authenticate every user, administrator and system interface.',acct:'Record all security-relevant actions and attribute them to an identity.',mon:'Detect and respond to security events affecting the system in time.',recov:'Restore the system within RTO and RPO after loss or compromise.',prot:'Reduce the attack surface through segregation, hardening and patching.',priv:'Process personal data lawfully under PDPL.',comp:'Meet all applicable NCA controls for the system.',gov:'Keep ownership, risk and change under formal control.',assure:'Verify control effectiveness through independent testing.',supp:'Hold suppliers and cloud providers to the same requirements.'};
+ return Object.keys(BA).filter(k=>baPri(k)==='High').map(k=>[BA[k][0],O[k]]);
+}
+function flowSentence(f){
+ const weakE=WEAK_ENC.includes(f.enc)&&f.cls!=='Public',weakA=['None','Unknown'].includes(f.auth);
+ return `<b>${esc(f.from)} → ${esc(f.to)}</b>: ${esc(f.proto||'?')}${f.port?'/'+esc(f.port):''}, ${esc(f.cls||'unclassified')} data, ${weakE?`<span class="bad">${esc(f.enc)}</span>`:esc(f.enc||'encryption not stated')}, ${weakA?`<span class="bad">${esc(f.auth)}</span>`:esc(f.auth||'authentication not stated')}.`;
+}
+function matrixHTML(items){
+ return `<div class="tbl-wrap"><table class="sx"><thead><tr><th>Layer</th>${QK.map(q=>`<th>${QN[q][0]} <span class="muted" style="font-weight:400">${QN[q][1]}</span></th>`).join('')}</tr></thead><tbody>
+ ${LAYERS.map((L,i)=>`<tr><td><b>${L.n}</b><div class="muted" style="font-size:11.5px">${L.view}</div></td>${L.cells.map(c=>{const s=cellStatus(i,c,items);return `<td class="c-${s.st}"><b>${c.n}</b><span class="m">${s.st==='na'?'n/a':s.info?(s.ok+'/'+s.n+' documented'):(s.ok+'/'+s.n+' in the design')}</span></td>`}).join('')}</tr>`).join('')}
+ </tbody></table></div>`;
+}
+
+/* ============================== HLD ============================== */
+function renderHLD(m){
+ const a=A(),sy=cur(),items=allItems(),fs=findings(items),bap=bapRows(items);
+ const zones=zonesInUse();
+ const kv=[['Project',a.projName],['Project stage',a.stage],['Planned go-live',a.goLive],['System type',a.sysType],['Purpose',a.sysDesc],['Processes supported',a.bProc],['Sourcing',a.devModel],['Exposure',a.exposure],['Users',[a.usersPublic==='Yes'&&'Public',a.usersStaff==='Yes'&&'Staff',a.usersPartner==='Yes'&&'Partners'].filter(Boolean).join(', ')+(a.userCount?` (~${a.userCount})`:'')],['Data classification',a.dataClass],['Personal data',a.personal],['Critical system',a.critical],['Hosting',a.hosting],['Sites',a.sites],['User locations',a.userGeo],['Service hours',a.svcHours],['Availability target',a.avail],['RTO / RPO',(a.rto||'?')+' h / '+(a.rpo||'?')+' h'],['Business impact',a.bImpact],['Risk appetite',a.appetite],['Technical owner',a.techOwner]];
+ const obj=objectives();
+ m.innerHTML=`<article class="doc">${docHead('High-Level Design · SABSA contextual, conceptual and logical layers','HLD · SECURITY ARCHITECTURE')}
+ <div class="part">Contextual layer · business view</div>
+ <h3><span class="n">1</span>Business context</h3>
+ <dl class="kv">${kv.map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl>
+ <h3><span class="n">2</span>Business drivers and risk</h3>
+ <p><b>Drivers for security:</b> ${esc(val('drivers')||'not stated')}.</p>
+ <p><b>Threat scenarios of most concern:</b> ${esc(val('threats')||'not stated')}.</p>
+ <p>Applicable NCA frameworks: ${frameworksOn().map(f=>`<b>${f.n}</b>`).join(', ')}.${a.personal==='Yes'?' Personal data is processed, so the Personal Data Protection Law (PDPL) also applies.':''}</p>
+ <div class="part">Conceptual layer · architect's view</div>
+ <h3><span class="n">3</span>Business Attributes Profile</h3>
+ <p class="muted">Each attribute is a business requirement for security. Its status is rolled up from the controls traced to it.</p>
+ <div class="tbl-wrap"><table><thead><tr><th>Attribute</th><th>Priority</th><th>Definition</th><th>Measured by</th><th class="num">Controls</th><th class="num">Gaps</th><th>Score</th><th>Status</th></tr></thead><tbody>
+ ${bap.map(r=>`<tr><td><b>${r.n}</b></td><td><span class="pri ${r.pri}">${r.pri}</span></td><td>${r.d}</td><td>${r.m}</td><td class="num">${r.n_}</td><td class="num ${r.gaps?'bad':''}">${r.gaps}</td><td>${r.sc==null?'–':`<span class="mono">${r.sc}%</span><div class="bar"><i style="width:${r.sc}%"></i></div>`}</td><td><span class="pill ${r.st}">${ST_LABEL[r.st]}</span></td></tr>`).join('')}
+ </tbody></table></div>
+ <h3><span class="n">4</span>Control objectives and security strategy</h3>
+ ${obj.length?`<ul>${obj.map(([n,t])=>`<li><b>${n}.</b> ${t}</li>`).join('')}</ul>`:'<p class="muted">No attribute is rated High priority.</p>'}
+ <p><b>Strategies adopted:</b> ${esc(val('strat')||'not stated')}. Controls are layered across entry services, domain boundaries, platforms, data and operations so that no single failure exposes the business assets.</p>
+ <h3><span class="n">5</span>Security domain model</h3>
+ <p class="muted">Public users and partners connect from the Internet; internal staff and administrators connect from the User zone. Both reach the system through the entry services. Components are grouped by security zone, and supporting services span all zones.</p>
+ <div class="diagram">${diagramSVG()}</div>
+ <div class="legend"><span><i class="sw" style="border-color:var(--ok);background:var(--ok-soft)"></i>In the design</span><span><i class="sw" style="border-color:var(--warn);background:var(--warn-soft)"></i>Partly</span><span><i class="sw" style="border-color:var(--crit);border-style:dashed;background:var(--crit-soft)"></i>Missing</span><span><i class="sw" style="border-color:var(--na);border-style:dotted"></i>Not answered</span><span><i class="sw" style="border-color:var(--accent);background:var(--accent-soft)"></i>Component</span><span><i class="ln" style="border-color:var(--crit);border-top-style:dashed"></i>Weakly encrypted flow</span></div>
+ ${zones.length?`<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Zone</th><th>Trust level</th><th>Users and components</th><th>Boundary control</th></tr></thead><tbody>${zones.map(z=>`<tr><td><b>${z}</b></td><td>${ZTRUST[z]}</td><td>${[...actorList().filter(n=>ACTOR_ZONE[n]===z).map(esc),...sy.comps.filter(c=>c.zone===z).map(c=>esc(c.n)+(badComp(c)?' <span class="bad">(wrong zone for tier)</span>':''))].join('<br>')}</td><td>${ZCTRL[z]}</td></tr>`).join('')}</tbody></table></div>`:''}
+ <div class="part">Logical layer · designer's view</div>
+ <h3><span class="n">6</span>Logical security services</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Security service</th><th>Purpose</th><th>Solutions</th><th>Status</th><th>ECC</th></tr></thead><tbody>
+ ${SERVICES.map(([n,d,ids])=>{const st=svcStatus(ids);if(st==='na')return '';const ps=[...new Set(ids.map(prod).filter(Boolean))];return `<tr><td><b>${n}</b></td><td>${d}</td><td>${ps.length?ps.map(esc).join('<br>'):'<span class="muted">Not specified</span>'}</td><td><span class="pill ${st}">${ST_LABEL[st]}</span></td><td class="mono" style="font-size:12px">${[...new Set(ids.filter(id=>statusOf(FMAP[id])!=='na').flatMap(id=>FMAP[id].c.map(sub)))].join(', ')}</td></tr>`}).join('')}
+ </tbody></table></div>
+ <h3><span class="n">7</span>Information flows between domains</h3>
+ ${sy.ifs.length?`<ul>${sy.ifs.map(f=>`<li>${flowSentence(f)}</li>`).join('')}</ul>`:'<div class="empty">No interfaces were entered.</div>'}
+ <div class="part">Traceability</div>
+ <h3><span class="n">8</span>SABSA matrix coverage</h3>
+ <p class="muted">The 36 cells of the SABSA matrix, coloured by how complete each one is for this system.</p>
+ ${matrixHTML(items)}
+ <h3><span class="n">9</span>Required controls not yet in the design</h3>
+ ${(()=>{const top=fs.filter(x=>x.st==='gap'&&(x.sev==='C'||x.sev==='H')).slice(0,8);return top.length?`<ul>${top.map(x=>`<li><span class="sev ${x.sev}">${SEV[x.sev].n}</span> ${esc(x.title)} <span class="fw">ECC ${x.refs.join(', ')}</span></li>`).join('')}</ul><p><a href="#gaps" data-tab="gaps">See all required controls</a></p>`:'<p>Every critical and high priority control is in the design or partly in it.</p>'})()}
+ </article>${commentsHTML('hld')}`;
+}
+
+/* ============================== LLD ============================== */
+function zoneOf(n){const c=compByName(n);if(c)return c.zone;const m=ACTORS.find(x=>lc(x)===lc(n));return m?ACTOR_ZONE[m]:'External'}
+/* The user groups this system has: from the profile, plus any named in an interface */
+function actorList(){
+ const a=A(),out=[];
+ if(a.usersPublic==='Yes')out.push('Public users');
+ if(a.usersPartner==='Yes')out.push('Partners / third parties');
+ if(a.usersStaff==='Yes')out.push('Internal staff');
+ out.push('Administrators');
+ cur().ifs.forEach(f=>[f.from,f.to].forEach(e=>{const m=ACTORS.find(x=>lc(x)===lc(e));if(m&&!out.includes(m))out.push(m)}));
+ return ACTORS.filter(n=>out.includes(n));
+}
+function zonesInUse(){const who=new Set(actorList().map(n=>ACTOR_ZONE[n]));return ZONES.filter(z=>who.has(z)||cur().comps.some(c=>c.zone===z))}
+function hostOf(n){const c=compByName(n);return c&&c.host?c.host:'—'}
+function fwRules(){
+ const a=A(),sy=cur(),R=[];
+ sy.ifs.forEach(f=>{if(!f.from||!f.to)return;R.push([f.from,zoneOf(f.from),f.to+' ('+hostOf(f.to)+')',zoneOf(f.to),(f.proto||'?')+'/'+(f.port||'?'),'Allow',`${f.cls||''} · ${f.enc||''} · ${f.auth||''}`])});
+ if(selfHost(a)&&sy.comps.length){
+  R.push(['PAM jump hosts','Management zone','All system components','All','SSH 22 / RDP 3389 / admin HTTPS','Allow','Administration via PAM only']);
+  R.push(['All system components','All','SIEM collectors','Management zone','Syslog-TLS 6514 / agent','Allow','Security logging']);
+  if(sy.comps.some(c=>['Database','File / object storage'].includes(c.tier)))R.push(['Backup media servers','Management zone','Data tier components','Database zone','Backup agent ports','Allow','Backup']);
+  R.push(['Vulnerability scanners','Management zone','All system components','All','Any (scan window)','Allow','Authenticated scanning']);
+ }
+ R.push(['Any','Any','Any system component','Any','Any','Deny + log','Default deny']);
+ return R;
+}
+function roles(){
+ const a=A(),mfaAdm=val('iMfaAdm')==='Yes'?'Enforced':'<span class="bad">Required, not fully enforced</span>',R=[];
+ if(a.usersPublic==='Yes')R.push(['Public user','National SSO / OIDC',val('iMfaPub')==='Yes'?'Enforced':'<span class="bad">Required for sensitive actions</span>','Self-registration with identity verification','Dormant accounts disabled','Logins, profile changes, transactions']);
+ if(a.usersStaff!=='No')R.push(['Internal user','Entity IdP (SSO)',inet(a)?(val('iMfaExt')==='Yes'?'Enforced off-network':'<span class="bad">Required off-network</span>'):'Conditional','Role-based via access request','User access review: '+(val('iReview')||'TBD'),'Logins, data access']);
+ if(a.usersPartner==='Yes')R.push(['Partner user','Federated or named account','Required','Sponsor approval, contract and NDA','Quarterly','Logins, data access']);
+ R.push(['Business administrator','Entity IdP + admin role',mfaAdm,'Approved by business owner','Quarterly','All admin actions']);
+ if(selfHost(a))R.push(['System administrator','Separate admin account via PAM',mfaAdm,'Approved by technical owner and security','Quarterly','Session recording']);
+ if(hasDB(a))R.push(['Database administrator','Named DBA account via PAM',mfaAdm,'Approved by technical owner and security','Quarterly','DB audit + DAM']);
+ R.push(['Service account','Vaulted secret / managed identity','N/A (non-interactive)','Owner and purpose documented','Semi-annual','Anomalous use alerts']);
+ if(vendor(a))R.push(['Vendor support','Named, time-bound account via PAM',mfaAdm,'Ticket-based approval per session','Per session','Session recording']);
+ return R.map(r=>r.filter((_,i)=>i!==4));
+}
+function mechanisms(){
+ return [['Web application firewall','wWaf','Blocking mode, OWASP rule set, bot protection'],['API gateway','wApi','OAuth2 / mTLS, quotas, schema validation'],['DDoS protection','wDdos','Upstream or cloud scrubbing'],['Identity provider / SSO','iSso','SAML / OIDC federation'],['Multi-factor authentication',inet(A())?'iMfaExt':'iMfaAdm','Phishing-resistant for administrators'],['Privileged access management','iPam','Vaulting, session recording, rotation'],['Endpoint detection and response','hEdr','Block mode, tamper protection'],['Transport encryption','dTls','TLS 1.2+ with approved cipher suites'],['Encryption at rest','dRest','AES-256, TDE or volume encryption'],['Key management','dKms','HSM-backed, rotation, access logged'],['Secrets vault','sSecrets','No credentials in code or config'],['SIEM','lSiem','All components onboarded, time-synchronised'],['Database activity monitoring','dDam','Privileged and bulk access alerts'],['Backup','bScope','Per RPO, encrypted'],['Immutable backup copy','bImm','Isolated from production credentials'],['Vulnerability scanner','vScan','Authenticated scans']]
+  .map(([n,f,std])=>({n,f,std,st:statusOf(FMAP[f])})).filter(x=>x.st!=='na');
+}
+function checklist(){
+ return [['Security risk assessment','gRisk'],['Security requirements approved','gReq'],['Threat model reviewed','sThreat'],['Hardening baseline applied','hHarden'],['All components patched','hPatch'],['Code review and SAST','sCode'],['Vulnerability scan clean','vScan'],['Penetration test done and fixed','pPre'],['Logs reaching the SIEM','lSiem'],['SOC monitoring onboarded','lSoc'],['Backup restore tested','bTest'],['DR failover tested','rDrTest'],['Handover to operations','oHand'],['Cybersecurity sign-off','gGolive']]
+  .map(([n,f])=>({n,f,st:statusOf(FMAP[f]),v:val(f)})).filter(x=>x.st!=='na');
+}
+function renderLLD(m){
+ const a=A(),sy=cur(),ret=val('lRet')||'12',tls=val('dTls')||'TLS 1.2 minimum';
+ const tiers=[...new Set(sy.comps.map(c=>c.tier))];
+ m.innerHTML=`<article class="doc">${docHead('Low-Level Design · SABSA physical, component and service management layers','LLD · SECURITY ARCHITECTURE')}
+ <div class="part">Physical layer · builder's view</div>
+ <h3><span class="n">1</span>Security mechanisms</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Mechanism</th><th>Product</th><th>Required configuration</th><th>Status</th><th>ECC</th></tr></thead><tbody>
+ ${mechanisms().map(x=>`<tr><td><b>${x.n}</b></td><td>${esc(prod(x.f)||'—')}</td><td>${x.std}${val(x.f)&&FMAP[x.f].t==='sel'?`<div class="fw">Design: ${esc(val(x.f))}</div>`:''}</td><td><span class="pill ${x.st}">${ST_LABEL[x.st]}</span></td><td class="mono" style="font-size:12px">${FMAP[x.f].c.join(', ')}</td></tr>`).join('')}
+ </tbody></table></div>
+ <h3><span class="n">2</span>Platform and network: component inventory</h3>
+ ${sy.comps.length?`<div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Tier</th><th>Technology</th><th>Zone</th><th>Host / IP</th><th class="num">Port</th><th>Placement</th></tr></thead><tbody>
+ ${sy.comps.map(c=>`<tr><td><b>${esc(c.n)}</b></td><td>${esc(c.tier)}</td><td>${esc(c.tech||'—')}</td><td>${esc(c.zone)}</td><td class="mono">${esc(c.host||'—')}</td><td class="num">${esc(c.port||'—')}</td><td>${badComp(c)?'<span class="pill gap">Wrong zone</span>':'<span class="pill met">OK</span>'}</td></tr>`).join('')}
+ </tbody></table></div>`:'<div class="empty">No components were entered.</div>'}
+ <h3><span class="n">3</span>Interface specification</h3>
+ ${sy.ifs.length?`<div class="tbl-wrap"><table><thead><tr><th class="num">#</th><th>Source</th><th>Destination</th><th>Protocol / port</th><th>Data class</th><th>Encryption</th><th>Authentication</th><th>Assessment</th></tr></thead><tbody>
+ ${sy.ifs.map((f,i)=>{const e=WEAK_ENC.includes(f.enc)&&f.cls!=='Public',au=['None','Unknown'].includes(f.auth),w=['Basic / username-password','API key'].includes(f.auth);const st=e||au?'gap':w?'partial':'met';
+  return `<tr><td class="num">IF-${String(i+1).padStart(2,'0')}</td><td>${esc(f.from)}<div class="fw">${esc(zoneOf(f.from))}</div></td><td>${esc(f.to)}<div class="fw">${esc(zoneOf(f.to))}</div></td><td class="mono">${esc(f.proto)} / ${esc(f.port)}</td><td>${esc(f.cls)}</td><td class="${e?'bad':''}">${esc(f.enc)}</td><td class="${au?'bad':''}">${esc(f.auth)}</td><td><span class="pill ${st}">${st==='met'?'OK':st==='partial'?'Strengthen':'Fix'}</span></td></tr>`}).join('')}
+ </tbody></table></div>`:'<div class="empty">No interfaces were entered.</div>'}
+ <h3><span class="n">4</span>Firewall rule set</h3>
+ <p class="muted">Derived from the interface specification plus standard administration, logging, backup and scanning flows. Everything else is denied.</p>
+ <div class="tbl-wrap"><table><thead><tr><th class="num">Rule</th><th>Source</th><th>Source zone</th><th>Destination</th><th>Destination zone</th><th>Service</th><th>Action</th><th>Notes</th></tr></thead><tbody>
+ ${fwRules().map((r,i)=>`<tr><td class="num">${String(i+1).padStart(3,'0')}</td>${r.map((c,j)=>`<td class="${j===5&&c!=='Allow'?'bad':''}">${esc(c)}</td>`).join('')}</tr>`).join('')}
+ </tbody></table></div>
+ <div class="part">Component layer · tradesman's view</div>
+ <h3><span class="n">5</span>Identities, roles and access</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Role</th><th>Authentication</th><th>MFA</th><th>Provisioning</th><th>Logging</th></tr></thead><tbody>
+ ${roles().map(r=>`<tr><td><b>${r[0]}</b></td>${r.slice(1).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}
+ </tbody></table></div>
+ <h3><span class="n">6</span>Security standards by tier</h3>
+ ${tiers.length?`<div class="cfg">${tiers.map(t=>`<div class="card"><h4>${esc(t)}</h4><div class="prod">${esc(sy.comps.filter(c=>c.tier===t).map(c=>c.tech||c.n).join(', '))}</div><ul>${(TIER_BASE[t]||TIER_BASE.Other).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>`:'<div class="empty">Add components in the form to generate tier baselines.</div>'}
+ <h3><span class="n">7</span>Cryptography specification</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Area</th><th>Requirement</th><th>In this design</th></tr></thead><tbody>
+  <tr><td><b>Data in transit (external)</b></td><td>TLS 1.2+ with approved cipher suites, HSTS</td><td>${esc(tls)}</td></tr>
+  <tr><td><b>Data in transit (internal)</b></td><td>mTLS or TLS 1.2+ between components; native encryption for DB connections</td><td>${sy.ifs.filter(f=>WEAK_ENC.includes(f.enc)).length?`<span class="bad">${sy.ifs.filter(f=>WEAK_ENC.includes(f.enc)).length} interface(s) unencrypted or weak</span>`:'All recorded interfaces encrypted'}</td></tr>
+  <tr><td><b>Data at rest</b></td><td>AES-256 for Restricted and above, including backups</td><td>${esc(val('dRest')||'Not answered')}</td></tr>
+  <tr><td><b>Key management</b></td><td>HSM-backed KMS, separation of duties, rotation, access logged</td><td>${esc(val('dKms')||'Not answered')}</td></tr>
+  <tr><td><b>Algorithms</b></td><td>Per NCA National Cryptographic Standards</td><td>${esc(val('dNcs')||'Not answered')}</td></tr>
+ </tbody></table></div>
+ <h3><span class="n">8</span>Logging specification</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Component</th><th>Events to log</th><th>Destination</th><th class="num">Retention</th></tr></thead><tbody>
+ ${sy.comps.map(c=>`<tr><td><b>${esc(c.n)}</b></td><td>${esc(TIER_LOGS[c.tier]||TIER_LOGS.Other)}</td><td>${esc(prod('lSiem')||'SIEM')}</td><td class="num">${esc(ret)} mo</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No components were entered.</td></tr>'}
+ </tbody></table></div>
+ <div class="part">Service management layer · operational view</div>
+ <h3><span class="n">9</span>Backup and recovery</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>Scope</th><th>Method</th><th>Copies</th><th class="num">RPO</th><th class="num">RTO</th><th>Restore tested</th></tr></thead><tbody>
+ ${(sy.comps.filter(c=>['Database','File / object storage','Application','Presentation / web','API gateway','Integration / ESB'].includes(c.tier)).map(c=>`<tr><td><b>${esc(c.n)}</b></td><td>${['Database','File / object storage'].includes(c.tier)?'Full weekly + incremental / log backups':'Image or configuration backup'}</td><td>Primary + DR site${val('bImm')==='Yes'?' + immutable':statusOf(FMAP.bImm)==='na'?'':' <span class="bad">(no immutable copy)</span>'}</td><td class="num">${esc(a.rpo||'—')} h</td><td class="num">${esc(a.rto||'—')} h</td><td>${esc(val('bTest')||'TBD')}</td></tr>`).join(''))||'<tr><td colspan="6" class="muted">No components were entered.</td></tr>'}
+ </tbody></table></div>
+ <h3><span class="n">10</span>Security activities planned before go-live</h3>
+ <p class="muted">What the project commits to complete before the system goes into service${a.goLive?' on '+esc(a.goLive):''}.</p>
+ <div class="tbl-wrap"><table><thead><tr><th>Step</th><th>Answer</th><th>Status</th><th>ECC</th></tr></thead><tbody>
+ ${checklist().map(x=>`<tr><td><b>${x.n}</b></td><td>${esc(x.v||'Not answered')}</td><td><span class="pill ${x.st}">${ST_LABEL[x.st]}</span></td><td class="mono" style="font-size:12px">${FMAP[x.f].c.join(', ')}</td></tr>`).join('')}
+ </tbody></table></div>
+ <p class="disclaimer">Rows not taken from the form (baselines, rule notes, targets) are recommended defaults. Adjust them to the entity's approved standards.</p>
+ </article>${commentsHTML('lld')}`;
+}
+
+/* ============================== THREAT MODEL (STRIDE per element) ============================== */
+const STRIDE={S:'Spoofing',T:'Tampering',R:'Repudiation',I:'Information disclosure',D:'Denial of service',E:'Elevation of privilege'};
+/* [STRIDE category, threat, mitigating questions, matching "threat of most concern"] */
+const TIER_THREATS={
+ 'Presentation / web':[['T','Injection or cross-site scripting through user input',['sOwasp','wWaf','sCode'],'Web and API attacks'],['I','Session or traffic intercepted or downgraded',['wHttps','dTls','dCert'],'Data breach or leakage'],['D','Public endpoint flooded or abused by bots',['wDdos','wBot','rHa'],'Service outage / DDoS']],
+ 'API gateway':[['S','Forged or stolen API credentials used to call the APIs',['wApi','sSecrets','iSvc'],'Web and API attacks'],['D','API exhausted by excessive or malformed requests',['wApi','wBot','wDdos'],'Service outage / DDoS']],
+ 'Application':[['T','Malicious or vulnerable code or library reaches production',['sCode','sSca','sEnv','sVendor'],'Vendor or supply-chain compromise'],['E','Unpatched or misconfigured server exploited to take control',['hHarden','hPatch','hEol','hEdr','nPorts'],'Ransomware / destructive attack'],['I','Passwords or keys leaked from code or configuration',['sSecrets','dKms'],'Data breach or leakage']],
+ 'Database':[['I','Bulk extraction of data from the database',['dRest','dDam','dDlp','dccNeed','iPam'],'Data breach or leakage'],['T','Data encrypted, altered or destroyed (ransomware)',['bScope','bImm','bTest','hEdr'],'Ransomware / destructive attack'],['E','Database reached directly, bypassing the application',['hSeg','hFw','wTier','iDefault','hMgmt'],'Data breach or leakage']],
+ 'File / object storage':[['I','Stored files read by an unauthorised party',['dRest','iRbac','hFw','dccWater'],'Data breach or leakage'],['T','Files encrypted or deleted (ransomware)',['bScope','bImm','bTest'],'Ransomware / destructive attack']],
+ 'Integration / ESB':[['T','Messages altered or injected between systems',['dTls','hFw','lApp'],'Fraud / transaction tampering'],['S','Integration credentials reused to impersonate a system',['iSvc','sSecrets'],'Account takeover']],
+ 'Identity / auth':[['S','Login tokens or assertions forged or replayed',['iSso','dCert','iSession'],'Account takeover']],
+ 'Batch / scheduler':[['E','Scheduled job or its service account abused to run commands',['iSvc','sSecrets','iPam'],'Insider misuse']],
+ 'Mobile client':[['T','App reverse-engineered or tampered with',['sMob','sCode'],'Web and API attacks'],['I','Data read from a lost or rooted device',['sMob'],'Data breach or leakage']],
+ 'Desktop client':[['I','Credentials or data left on the workstation',['iSso','dTls'],'Data breach or leakage']],
+ 'HMI / SCADA':[['T','Unauthorised commands sent to the process',['otSeg','otInet','otRemote','iMfaAdm'],'Ransomware / destructive attack'],['D','Operator loses view or control',['otSeg','otMon','rHa'],'Service outage / DDoS']],
+ 'Controller / PLC':[['T','Controller logic or setpoints changed',['otSeg','otSis','otRemote'],'Ransomware / destructive attack']],
+ 'Other':[['E','Component exploited through weak configuration',['hHarden','hPatch','iDefault'],'Ransomware / destructive attack']]
+};
+const SYS_THREATS=[
+ ['S','User account taken over (stolen or guessed password)',['iSso','iMfaExt','iMfaPub','iSession','wBot'],'Account takeover'],
+ ['E','Administrator account compromised',['iMfaAdm','iPam','hMgmt','lPriv','iDefault'],'Account takeover'],
+ ['R','Actions cannot be traced to a person',['iUnique','lApp','lSiem','lInteg','hNtp','lRet'],'Insider misuse'],
+ ['E','Insider uses more access than the role needs',['iRbac','dccNeed','iLeaver','dDlp','dccWater'],'Insider misuse'],
+ ['T','Vendor or support access misused',['tContract','tRemote','otRemote','dccTp'],'Vendor or supply-chain compromise'],
+ ['I','Data exposed at the cloud or SaaS provider',['cKsa','cProv','cTenant','cExit','cSso'],'Data breach or leakage'],
+ ['I','Real data leaks from test environments',['sMask','sEnv'],'Data breach or leakage'],
+ ['D','Site or platform failure takes the service down',['rHa','rDr','rDrTest','bTest'],'Service outage / DDoS'],
+ ['R','Attack goes unnoticed',['lSiem','lSoc','lUse','hEdr','dDam','otMon'],'Ransomware / destructive attack']
+];
+const TM_LABEL={met:'Mitigated',partial:'Partly mitigated',gap:'Not mitigated',open:'Not answered'};
+function threats(){
+ const a=A(),sy=cur(),out=[],concern=Array.isArray(a.threats)?a.threats:[];
+ const cls=['Secret','Top Secret'].includes(a.dataClass)?1:a.dataClass==='Restricted'?0.5:0;
+ const add=(el,cat,title,mit,tc,exposed)=>{
+  mit=mit.filter(m=>m.st!=='na');if(!mit.length)return;
+  const sts=mit.map(m=>m.st);
+  const st=sts.every(s=>s==='met')?'met':sts.every(s=>s==='open')?'open':sts.some(s=>s==='met'||s==='partial')?'partial':sts.includes('gap')?'gap':'open';
+  const sc=(exposed?1:0)+cls+(a.critical==='Yes'?0.5:0)+(concern.includes(tc)?1:0);
+  const risk=sc>=2?'High':sc>=1?'Medium':'Low';
+  const res=st==='met'?'Low':st==='partial'?({High:'Medium',Medium:'Low',Low:'Low'})[risk]:risk;
+  out.push({id:'T-'+String(out.length+1).padStart(2,'0'),el,cat,title,mit,st,risk,res,concern:concern.includes(tc)});
+ };
+ const fm=ids=>ids.map(id=>FMAP[id]).filter(Boolean).map(f=>({l:f.l,st:statusOf(f),refs:f.c}));
+ SYS_THREATS.forEach(([cat,title,ids,tc])=>add('Whole system',cat,title,fm(ids),tc,inet(a)));
+ sy.comps.forEach(c=>(TIER_THREATS[c.tier]||TIER_THREATS.Other).forEach(([cat,title,ids,tc])=>add(c.n,cat,title,fm(ids),tc,['DMZ','Internet','SaaS provider'].includes(c.zone))));
+ sy.ifs.forEach(f=>{
+  if(!f.from||!f.to)return;
+  const el=`${f.from} → ${f.to}`,zf=zoneOf(f.from),zt=zoneOf(f.to),cross=zf!==zt,exp=[zf,zt].some(z=>z==='Internet'||z==='External');
+  const sens=f.cls&&f.cls!=='Public',weak=WEAK_ENC.includes(f.enc);
+  add(el,'I',`Data read or changed in transit${cross?' across the '+zf+' / '+zt+' boundary':''}`,[{l:'Encryption in transit: '+(f.enc||'not stated'),st:!f.enc?'open':weak?(sens?'gap':'partial'):'met',refs:['2-8-3']}],'Data breach or leakage',exp);
+  const wa=['None','Unknown'].includes(f.auth),ma=['Basic / username-password','API key'].includes(f.auth);
+  add(el,'S',`${f.from} impersonated when connecting to ${f.to}`,[{l:'Authentication: '+(f.auth||'not stated'),st:!f.auth?'open':wa?'gap':ma?'partial':'met',refs:['2-2-3-1']}],'Account takeover',exp);
+ });
+ return out;
+}
+function renderThreat(m){
+ const a=A(),sy=cur(),all=threats(),so={gap:0,partial:1,open:2,met:3},ro={High:0,Medium:1,Low:2};
+ let list=all.slice().sort((p,q)=>so[p.st]-so[q.st]||ro[p.res]-ro[q.res]);
+ if(UI.tm&&UI.tm!=='all')list=list.filter(x=>x.st===UI.tm);
+ if(UI.ts&&UI.ts!=='all')list=list.filter(x=>x.cat===UI.ts);
+ const cnt=s=>all.filter(x=>x.st===s).length;
+ const zones=zonesInUse();
+ const bounds=[...new Set(sy.ifs.filter(f=>f.from&&f.to&&zoneOf(f.from)!==zoneOf(f.to)).map(f=>zoneOf(f.from)+' → '+zoneOf(f.to)))];
+ m.innerHTML=`<article class="doc">${docHead('Threat model · STRIDE per element','THREAT MODEL')}
+ <h3><span class="n">1</span>Scope and method</h3>
+ <p>The model is built from the form. Every component, every interface and the system as a whole is checked against the six STRIDE categories. Each threat is linked to the controls that mitigate it, and its status comes from the answers given for those controls.</p>
+ <dl class="kv">
+  <div><dt>Assets</dt><dd>${esc(a.dataClass||'Unclassified')} data${a.personal==='Yes'?', personal data':''}; ${esc(a.bProc||a.sysDesc||'business service')}</dd></div>
+  <div><dt>Who can reach it</dt><dd>${[a.usersPublic==='Yes'&&'Public users',a.usersStaff==='Yes'&&'Internal staff',a.usersPartner==='Yes'&&'Partners','Administrators',vendor(a)&&'Vendor support'].filter(Boolean).join(', ')}</dd></div>
+  <div><dt>Exposure</dt><dd>${esc(a.exposure||'—')}</dd></div>
+  <div><dt>Threats of most concern</dt><dd>${esc(val('threats')||'Not stated')}</dd></div>
+  <div><dt>Security zones</dt><dd>${zones.map(esc).join(', ')||'No components entered'}</dd></div>
+  <div><dt>Trust boundaries crossed</dt><dd>${bounds.map(esc).join('; ')||'None recorded'}</dd></div>
+ </dl>
+ <h3><span class="n">2</span>Data flow diagram</h3>
+ <div class="diagram">${diagramSVG()}</div>
+ <h3><span class="n">3</span>Summary</h3>
+ <div class="summary">
+  <div class="tile"><div class="k">Threats identified</div><div class="v">${all.length}</div></div>
+  <div class="tile C"><div class="k">Not mitigated</div><div class="v">${cnt('gap')}</div></div>
+  <div class="tile H"><div class="k">Partly mitigated</div><div class="v">${cnt('partial')}</div></div>
+  <div class="tile"><div class="k">Mitigated</div><div class="v">${cnt('met')}</div></div>
+  <div class="tile"><div class="k">Not answered</div><div class="v">${cnt('open')}</div></div></div>
+ <div class="tbl-wrap"><table><thead><tr><th>STRIDE category</th><th class="num">Threats</th><th class="num">Not mitigated</th><th class="num">Partly</th><th class="num">Mitigated</th><th class="num">High residual risk</th></tr></thead><tbody>
+ ${Object.entries(STRIDE).map(([k,n])=>{const t=all.filter(x=>x.cat===k);return `<tr><td><b>${n}</b></td><td class="num">${t.length}</td><td class="num ${t.some(x=>x.st==='gap')?'bad':''}">${t.filter(x=>x.st==='gap').length}</td><td class="num">${t.filter(x=>x.st==='partial').length}</td><td class="num">${t.filter(x=>x.st==='met').length}</td><td class="num">${t.filter(x=>x.res==='High').length}</td></tr>`}).join('')}
+ </tbody></table></div>
+ <h3><span class="n">4</span>Threat register</h3>
+ <div class="filters"><span class="fw">Status</span>${[['all','All'],['gap','Not mitigated'],['partial','Partly mitigated'],['met','Mitigated'],['open','Not answered']].map(([k,n])=>`<button class="chipf" data-tm="${k}" aria-pressed="${(UI.tm||'all')===k}">${n}</button>`).join('')}</div>
+ <div class="filters"><span class="fw">STRIDE</span><button class="chipf" data-ts="all" aria-pressed="${(UI.ts||'all')==='all'}">All</button>${Object.entries(STRIDE).map(([k,n])=>`<button class="chipf" data-ts="${k}" aria-pressed="${UI.ts===k}">${n}</button>`).join('')}</div>
+ <div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Element</th><th>STRIDE</th><th>Threat</th><th>Risk</th><th>Mitigating controls</th><th>Status</th><th>Residual risk</th></tr></thead><tbody>
+ ${list.length?list.map(x=>`<tr><td class="mono">${x.id}</td><td><b>${esc(x.el)}</b></td><td>${STRIDE[x.cat]}</td><td style="min-width:220px">${esc(x.title)}${x.concern?' <span class="ref ba" title="Listed as a threat of most concern">priority</span>':''}</td><td><span class="pri ${x.risk}">${x.risk}</span></td>
+  <td style="min-width:280px"><ul style="margin:0;padding-left:16px;font-size:12.5px">${x.mit.map(c=>`<li>${esc(c.l)} <span class="pill ${c.st}">${ST_LABEL[c.st]}</span> <span class="fw">ECC ${c.refs.join(', ')}</span></li>`).join('')}</ul></td>
+  <td><span class="pill ${x.st}">${TM_LABEL[x.st]}</span></td><td><span class="pri ${x.res}">${x.res}</span></td></tr>`).join(''):`<tr><td colspan="8" style="padding:24px;text-align:center" class="muted">No threats match these filters.</td></tr>`}
+ </tbody></table></div>
+ <p class="disclaimer">Risk is rated from exposure, data classification, criticality and whether the threat was marked as a concern in the form. Residual risk drops one level when a threat is partly mitigated and to Low when all its controls are in the design. This is a starting model generated from standard threat patterns: review it with the project team and add threats specific to the system's business logic.</p>
+ </article>${commentsHTML('threat')}`;
+}
+
+/* ============================== MISSING CONTROLS ============================== */
+function renderControls(m){
+ const a=A(),items=allItems(),all=required(items),dccOn=classified(a);
+ const cnt=s=>all.filter(x=>x.st===s).length,cst=['gap','partial','open','met'].includes(UI.cst)?UI.cst:'all',pri=['C','H','M','L'].includes(UI.sev)?UI.sev:'all';
+ let list=all;
+ if(cst!=='all')list=list.filter(x=>x.st===cst);
+ if(pri!=='all')list=list.filter(x=>x.sev===pri);
+ if(UI.lay!=='all')list=list.filter(x=>x.layer===+UI.lay);
+ if(UI.fw==='DCC'&&dccOn)list=list.filter(x=>x.dcc.length);
+ const sc=score(items),plan=meta().plan||{},ro=CTX?'disabled':'';
+ m.innerHTML=`<div class="summary">
+  <div class="tile"><div class="k">Required controls · ${esc(sysLabel())}</div><div class="v">${all.length}</div></div>
+  <div class="tile"><div class="k">In the design</div><div class="v" style="color:var(--ok)">${cnt('met')}</div></div>
+  <div class="tile H"><div class="k">Partly</div><div class="v">${cnt('partial')}</div></div>
+  <div class="tile C"><div class="k">Missing</div><div class="v">${cnt('gap')}</div></div>
+  <div class="tile"><div class="k">Not answered</div><div class="v">${cnt('open')}</div></div>
+  <div class="tile"><div class="k">Design compliance</div><div class="v">${sc==null?'–':sc+'%'}</div><div class="bar"><i style="width:${sc||0}%"></i></div></div></div>
+ <div class="filters"><span class="fw">Status</span>${[['all','All required'],['gap','Missing'],['partial','Partly'],['open','Not answered'],['met','In the design']].map(([k,n])=>`<button class="chipf" data-cst="${k}" aria-pressed="${cst===k}">${n}</button>`).join('')}</div>
+ <div class="filters"><span class="fw">Priority</span>${[['all','All'],['C','Critical'],['H','High'],['M','Medium'],['L','Low']].map(([k,n])=>`<button class="chipf" data-sev="${k}" aria-pressed="${pri===k}">${n}</button>`).join('')}</div>
+ <div class="filters"><span class="fw">SABSA layer</span><button class="chipf" data-lay="all" aria-pressed="${UI.lay==='all'}">All</button>${LAYERS.map((L,i)=>`<button class="chipf" data-lay="${i}" aria-pressed="${UI.lay===String(i)}">${L.n}</button>`).join('')}</div>
+ ${dccOn?`<div class="filters"><span class="fw">Framework</span><button class="chipf" data-fwf="all" aria-pressed="${UI.fw!=='DCC'}">All NCA controls</button><button class="chipf" data-fwf="DCC" aria-pressed="${UI.fw==='DCC'}">DCC only</button></div>`:''}
+ <div class="tbl-wrap"><table><thead><tr><th>Priority</th><th>NCA control</th><th>Required control</th><th>Status in this design</th><th>What the design must do</th><th>SABSA trace</th><th>Owner</th><th>Target date</th></tr></thead><tbody>
+ ${list.length?list.map(x=>{const p=plan[x.key]||{},done=x.st==='met';return `<tr class="gap-row"><td><span class="sev ${x.sev}">${SEV[x.sev].n}</span></td>
+  <td class="mono" style="font-size:12px;white-space:nowrap">${x.refs.map(r=>'ECC '+r).join('<br>')}<div class="fw">${companions(x).join('<br>')}</div></td>
+  <td><b>${esc(x.title)}</b><div class="muted" style="font-size:12.5px">${esc(SUBNAME[sub(x.refs[0])]||'')}</div></td>
+  <td><span class="pill ${x.st}">${ST_LABEL[x.st]}</span><div class="muted" style="font-size:12px;margin-top:3px">${esc(x.ans?'Answer: '+x.ans:'')}</div></td>
+  <td>${done?'<span class="muted">Already in the design.</span>':esc(x.rec)}</td>
+  <td style="min-width:150px"><b style="font-size:12.5px">${LAYERS[x.layer].n} · ${QN[x.q][0]}</b><div class="refs">${x.ba.map(k=>`<span class="ref ba" title="Priority: ${baPri(k)}">${BA[k][0]}${baPri(k)==='High'?' ▲':''}</span>`).join('')}</div></td>
+  ${done?'<td class="muted">—</td><td class="muted">—</td>':`<td><input id="own-${x.key}" data-plan="${x.key}" data-k="o" value="${esc(p.o||'')}" placeholder="Owner" aria-label="Owner" ${ro}></td>
+  <td><input id="due-${x.key}" data-plan="${x.key}" data-k="d" type="date" value="${esc(p.d||'')}" aria-label="Target date" ${ro}></td>`}</tr>`}).join(''):`<tr><td colspan="8" style="padding:24px;text-align:center" class="muted">No controls match these filters.</td></tr>`}
+ </tbody></table></div>
+ <p class="muted" style="font-size:12.5px;margin-top:8px">These are the controls this system must have, chosen from its type, hosting, exposure and data classification. ▲ marks a business attribute rated High priority in the Business Attributes Profile.</p>
+ ${dccOn?`<details class="fold" open><summary>DCC coverage for this system (data classified ${esc(a.dataClass)})</summary><div>
+ ${DCC.filter(d=>d.s.some(s=>dccStats(s[0],items).items.length)).map(d=>`<section class="dom"><h3><span class="n">Domain ${d.d}</span>${d.n}</h3><div class="tbl-wrap"><table><thead><tr><th>DCC</th><th>Subdomain</th><th>Status</th><th>Score</th><th class="num">Gaps</th><th>Items</th></tr></thead><tbody>
+ ${d.s.map(([id,n,obj])=>{const x=dccStats(id,items);if(!x.items.length)return '';return `<tr><td class="mono">${id}</td><td><b>${n}</b><div class="muted" style="font-size:12.5px">${obj}</div></td><td><span class="pill ${x.st}">${ST_LABEL[x.st]}</span></td>
+  <td>${x.score==null?'<span class="muted">–</span>':`<span class="mono">${x.score}%</span><div class="bar"><i style="width:${x.score}%"></i></div>`}</td><td class="num">${x.gaps}</td>
+  <td><details class="items"><summary>${x.items.length} item${x.items.length===1?'':'s'}</summary><ul>${x.items.map(i=>`<li>${esc(i.title)} <span class="pill ${i.st}">${ST_LABEL[i.st]}</span></li>`).join('')}</ul></details></td></tr>`}).join('')}
+ </tbody></table></div></section>`).join('')}
+ <p class="disclaimer">DCC requirements become stricter as the classification level rises. This table shows which DCC subdomains are evidenced by the form; check the specific requirements for ${esc(a.dataClass)} data in the DCC document.</p>
+ </div></details>`:''}
+ <details class="fold"><summary>ECC control coverage for this system</summary><div>
+ <div class="fwgrid">${FRAMEWORKS.map(f=>`<div class="fwcard ${f.on(a)?'on':''}"><b>${f.n}</b> <span class="pill ${f.on(a)?'met':'na'}">${f.on(a)?'Applies':'Not in scope'}</span><p>${f.d}</p></div>`).join('')}</div>
+ ${ECC.filter(d=>d.s.some(s=>subStats(s[0],items).items.length)).map(d=>`<section class="dom"><h3><span class="n">Domain ${d.d}</span>${d.n}</h3><div class="tbl-wrap"><table><thead><tr><th>ECC</th><th>Subdomain</th><th>Status</th><th>Score</th><th class="num">Gaps</th><th>Items</th></tr></thead><tbody>
+ ${d.s.map(([id,n,obj])=>{const x=subStats(id,items);if(!x.items.length)return '';return `<tr><td class="mono">${id}</td><td><b>${n}</b><div class="muted" style="font-size:12.5px">${obj}</div></td><td><span class="pill ${x.items.length?x.st:'na'}">${x.items.length?ST_LABEL[x.st]:'Entity-level'}</span></td>
+  <td>${x.score==null?'<span class="muted">–</span>':`<span class="mono">${x.score}%</span><div class="bar"><i style="width:${x.score}%"></i></div>`}</td><td class="num">${x.gaps}</td>
+  <td>${x.items.length?`<details class="items"><summary>${x.items.length} item${x.items.length===1?'':'s'}</summary><ul>${x.items.map(i=>`<li>${esc(i.title)} <span class="pill ${i.st}">${ST_LABEL[i.st]}</span></li>`).join('')}</ul></details>`:'<span class="muted" style="font-size:12.5px">Assessed for the whole organisation, not per system</span>'}</td></tr>`}).join('')}
+ </tbody></table></div></section>`).join('')}
+ <p class="disclaimer">Only the subdomains that apply to a system or project are listed; controls the organisation runs as a whole are left out. Control references follow the ECC-2:2024 structure. CSCC, CCC and OTCC are mapped to the equivalent ECC subdomain; DCC is mapped to its own subdomains. Confirm exact clause numbers and wording against the current NCA publications before using this as audit evidence.</p>
+ </div></details>${commentsHTML('gaps')}`;
+}
+
+/* ============================== EXPORT ============================== */
+const stripTags=s=>String(s??'').replace(/<[^>]+>/g,'');
+function contextRows(){
+ const a=A();
+ return [['Project',a.projName],['Project stage',a.stage],['Planned go-live',a.goLive],['System type',a.sysType],['Purpose',a.sysDesc],['Processes supported',a.bProc],['Business owner',a.owner],['Technical owner',a.techOwner],['Sourcing',a.devModel],['Hosting',a.hosting],['Sites',a.sites],['Exposure',a.exposure],['Users',actorList().join(', ')+(a.userCount?' (about '+a.userCount+')':'')],['Data classification',a.dataClass],['Personal data',a.personal],['Critical system',a.critical],['Service hours',a.svcHours],['Availability target',a.avail],['RTO / RPO',(a.rto||'?')+' h / '+(a.rpo||'?')+' h'],['Business impact',a.bImpact],['Risk appetite',a.appetite]].map(r=>[r[0],r[1]||'—']);
+}
+function cryptoRows(){
+ const weak=cur().ifs.filter(f=>WEAK_ENC.includes(f.enc)).length;
+ return [['Data in transit (external)','TLS 1.2+ with approved cipher suites, HSTS',val('dTls')||'Not answered'],['Data in transit (internal)','mTLS or TLS 1.2+ between components; native encryption for DB connections',weak?weak+' interface(s) unencrypted or weak':'All recorded interfaces encrypted'],['Data at rest','AES-256 for Restricted and above, including backups',val('dRest')||'Not answered'],['Key management','HSM-backed KMS, separation of duties, rotation, access logged',val('dKms')||'Not answered'],['Algorithms','Per NCA National Cryptographic Standards',val('dNcs')||'Not answered']];
+}
+function backupRows(){
+ const a=A(),copies='Primary + DR site'+(val('bImm')==='Yes'?' + immutable':statusOf(FMAP.bImm)==='na'?'':' (no immutable copy)');
+ return cur().comps.filter(c=>['Database','File / object storage','Application','Presentation / web','API gateway','Integration / ESB'].includes(c.tier)).map(c=>[c.n,['Database','File / object storage'].includes(c.tier)?'Full weekly + incremental / log backups':'Image or configuration backup',copies,(a.rpo||'—')+' h',(a.rto||'—')+' h',val('bTest')||'Not answered']);
+}
+function mermaidLines(){
+ const sy=cur(),L=['flowchart LR'],id=s=>'n'+lc(s).replace(/[^a-z0-9]/g,'_'),q=s=>String(s).replace(/"/g,"'"),seen=new Set();
+ zonesInUse().forEach(z=>{
+  L.push(`  subgraph z${id(z)}["${z}"]`);
+  actorList().filter(n=>ACTOR_ZONE[n]===z).forEach(n=>{seen.add(lc(n));L.push(`    ${id(n)}(["${n}"])`)});
+  sy.comps.filter(c=>c.zone===z).forEach(c=>{seen.add(lc(c.n));L.push(`    ${id(c.n)}["${q(c.n)}"]`)});
+  L.push('  end');
+ });
+ sy.ifs.forEach(f=>{
+  if(!f.from||!f.to)return;
+  [f.from,f.to].forEach(e=>{if(!seen.has(lc(e))){seen.add(lc(e));L.push(`  ${id(e)}(["${q(e)}"])`)}});
+  L.push(`  ${id(f.from)} -->|"${q(f.proto||'')} ${q(f.port||'')}${WEAK_ENC.includes(f.enc)?' WEAK':''}"| ${id(f.to)}`);
+ });
+ return L;
+}
+/* The whole design as a list of plain blocks, so the Markdown copy and the PDF say the same thing */
+function report(){
+ const a=A(),sy=cur(),items=allItems(),req=required(items),plan=meta().plan||{},sc=score(items),B=[];
+ const h1=x=>B.push({t:'h1',x}),h2=x=>B.push({t:'h2',x}),para=x=>B.push({t:'p',x}),ul=l=>B.push({t:'ul',l}),tb=(head,body)=>B.push({t:'table',head,body:body.map(r=>r.map(stripTags))});
+ const n=s=>req.filter(x=>x.st===s).length;
+ B.push({t:'title',x:sysLabel(),sub:'System Security Architecture Design',meta:[['Project',a.projName||'—'],['Business owner',a.owner||'—'],['Generated',(meta().genAt||'').slice(0,10)],['Review status',docReview().l],['Frameworks','SABSA, '+frameworksOn().map(f=>f.n).join(', ')],['Design compliance',sc==null?'—':sc+'%']]});
+ h1('Part A: High-Level Design');
+ h2('A1. Business context');tb(['Attribute','Value'],contextRows());
+ h2('A2. Business drivers and risk');para('Drivers for security: '+(val('drivers')||'not stated')+'.');para('Threats of most concern: '+(val('threats')||'not stated')+'.');
+ h2('A3. Business Attributes Profile');tb(['Attribute','Priority','Definition','Measured by','Controls','Missing','Score','Status'],bapRows(items).map(r=>[r.n,r.pri,r.d,r.m,r.n_,r.gaps,r.sc==null?'–':r.sc+'%',ST_LABEL[r.st]]));
+ h2('A4. Control objectives and security strategy');ul(objectives().map(([k,t])=>k+'. '+t));para('Strategies adopted: '+(val('strat')||'not stated')+'.');
+ h2('A5. Security zone model');B.push({t:'diagram'});
+ tb(['Zone','Trust level','Users and components','Boundary control'],zonesInUse().map(z=>[z,ZTRUST[z],[...actorList().filter(k=>ACTOR_ZONE[k]===z),...sy.comps.filter(c=>c.zone===z).map(c=>c.n)].join(', '),ZCTRL[z]]));
+ h2('A6. Logical security services');tb(['Security service','Purpose','Solutions','Status'],SERVICES.map(([k,d,ids])=>[k,d,[...new Set(ids.map(prod).filter(Boolean))].join(', ')||'—',svcStatus(ids)]).filter(r=>r[3]!=='na').map(r=>[r[0],r[1],r[2],ST_LABEL[r[3]]]));
+ h2('A7. Information flows');tb(['#','From','To','Protocol / port','Data class','Encryption','Authentication'],sy.ifs.map((f,i)=>['IF-'+String(i+1).padStart(2,'0'),f.from,f.to,(f.proto||'')+' / '+(f.port||''),f.cls,f.enc,f.auth]));
+ h2('A8. SABSA matrix coverage');tb(['Layer',...QK.map(k=>QN[k][0])],LAYERS.map((Ly,i)=>[Ly.n,...Ly.cells.map(c=>{const s=cellStatus(i,c,items);return c.n+': '+(s.st==='na'?'n/a':ST_LABEL[s.st])})]));
+ h1('Part B: Low-Level Design');
+ h2('B1. Security mechanisms');tb(['Mechanism','Product','Required configuration','Status','ECC'],mechanisms().map(x=>[x.n,prod(x.f)||'—',x.std,ST_LABEL[x.st],FMAP[x.f].c.join(', ')]));
+ h2('B2. Component inventory');tb(['Component','Tier','Technology','Zone','Host / IP','Port'],sy.comps.map(c=>[c.n,c.tier,c.tech||'—',c.zone,c.host||'—',c.port||'—']));
+ h2('B3. Firewall rule set');tb(['Rule','Source','Source zone','Destination','Destination zone','Service','Action','Notes'],fwRules().map((r,i)=>[String(i+1).padStart(3,'0'),...r]));
+ h2('B4. Identities, roles and access');tb(['Role','Authentication','MFA','Provisioning','Logging'],roles());
+ h2('B5. Security standards by tier');tb(['Tier','Components','Standard'],[...new Set(sy.comps.map(c=>c.tier))].map(t=>[t,sy.comps.filter(c=>c.tier===t).map(c=>c.n).join(', '),(TIER_BASE[t]||TIER_BASE.Other).join('; ')]));
+ h2('B6. Cryptography');tb(['Area','Requirement','In this design'],cryptoRows());
+ h2('B7. Logging');tb(['Component','Events to log','Destination','Retention'],sy.comps.map(c=>[c.n,TIER_LOGS[c.tier]||TIER_LOGS.Other,prod('lSiem')||'SIEM',(val('lRet')||'12')+' months']));
+ h2('B8. Backup and recovery');tb(['Scope','Method','Copies','RPO','RTO','Restore test planned'],backupRows());
+ h2('B9. Security activities planned before go-live');tb(['Step','Answer','Status'],checklist().map(x=>[x.n,x.v||'Not answered',ST_LABEL[x.st]]));
+ h1('Part C: Threat model');
+ para('STRIDE per element. Each threat is linked to the controls that mitigate it, and its status comes from the answers given for those controls.');
+ tb(['ID','Element','STRIDE','Threat','Risk','Mitigating controls','Status','Residual risk'],threats().map(x=>[x.id,x.el,STRIDE[x.cat],x.title,x.risk,x.mit.map(c=>c.l+' ['+ST_LABEL[c.st]+']').join('; '),TM_LABEL[x.st],x.res]));
+ h1('Part D: Required controls');
+ para(req.length+' controls are required for this system: '+n('met')+' in the design, '+n('partial')+' partly, '+n('gap')+' missing and '+n('open')+' not answered.');
+ tb(['Priority','NCA control','Required control','Status','What the design must do','SABSA trace','Owner','Target'],req.map(x=>{const pl=plan[x.key]||{};return[SEV[x.sev].n,['ECC '+x.refs.join(', '),...companions(x)].join('; '),x.title,ST_LABEL[x.st],x.st==='met'?'Already in the design':x.rec,LAYERS[x.layer].n+' / '+QN[x.q][0],pl.o||'',pl.d||'']}));
+ if(classified(a)){
+  h2('DCC coverage');
+  tb(['DCC','Subdomain','Status','Score','Missing'],DCC.flatMap(d=>d.s).map(([sid,name])=>({sid,name,x:dccStats(sid,items)})).filter(r=>r.x.items.length).map(r=>[r.sid,r.name,ST_LABEL[r.x.st],r.x.score==null?'–':r.x.score+'%',r.x.gaps]));
+ }
+ const rv=activeReview();
+ if(rv&&(rv.decision||(rv.comments||[]).length)){
+  h1('Part E: Cybersecurity review');
+  if(rv.decision){para('Decision on version '+rv.version+': '+DECISION[rv.decision]+' ('+String(rv.at||'').slice(0,10)+').');if(rv.summary)para(rv.summary)}
+  if((rv.comments||[]).length)tb(['Document','Section','Comment','Version','Status'],rv.comments.map(c=>[DOCS[c.doc]||'General',c.sec||'',c.text,c.v||1,c.done?'Resolved':'Open']));
+ }
+ para('Control references follow the ECC-2:2024 structure. Verify clause numbers against the current NCA publications.');
+ return B;
+}
+function md(){
+ const cell=x=>String(x??'').replace(/\|/g,'/').replace(/\n/g,' '),row=c=>'| '+c.map(cell).join(' | ')+' |',L=[];
+ report().forEach(b=>{
+  if(b.t==='title')L.push('# '+b.x+' — '+b.sub,'',b.meta.map(k=>'**'+k[0]+':** '+k[1]).join(' · '),'');
+  else if(b.t==='h1')L.push('# '+b.x,'');
+  else if(b.t==='h2')L.push('## '+b.x,'');
+  else if(b.t==='p')L.push(b.x,'');
+  else if(b.t==='ul')L.push(...b.l.map(x=>'- '+x),'');
+  else if(b.t==='table')L.push(row(b.head),row(b.head.map(()=>'---')),...b.body.map(row),'');
+  else if(b.t==='diagram')L.push('```mermaid',...mermaidLines(),'```','');
+ });
+ return L.join('\n');
+}
+
+/* ---- PDF ---- */
+const PDF_INK={'In the design':[29,122,76],'Mitigated':[29,122,76],'Resolved':[29,122,76],'Partly':[168,106,0],'Partly mitigated':[168,106,0],'Missing':[180,40,40],'Not mitigated':[180,40,40],'Critical':[180,40,40],'Not answered':[110,120,130]};
+/* The built-in PDF typeface covers Latin-1 only: swap the few symbols the report uses, and mark anything else as unshowable */
+const pdfText=s=>stripTags(s).replace(/→/g,'->').replace(/[—–]/g,'-').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,'...').replace(/[^\x00-\xFF]/g,'?');
+/* Draws the zone diagram to a PNG. An SVG used as an image cannot see the page's stylesheet, so each element's computed style is written onto it first (in the light theme, for a white page). */
+function diagramPNG(svgHtml){
+ return new Promise(resolve=>{
+  const root=document.documentElement,prev=root.getAttribute('data-theme'),host=document.createElement('div');
+  host.style.cssText='position:absolute;left:-99999px;top:0';
+  let xml='',w=0,h=0;
+  try{
+   root.setAttribute('data-theme','light');
+   host.innerHTML=svgHtml;document.body.appendChild(host);
+   const svg=host.querySelector('svg'),vb=svg.getAttribute('viewBox').split(/\s+/).map(Number);
+   w=vb[2];h=vb[3];
+   svg.querySelectorAll('rect,path,text,tspan').forEach(el=>{
+    const cs=getComputedStyle(el);
+    ['fill','stroke','stroke-width','stroke-dasharray','opacity','font-size','font-weight','letter-spacing','paint-order','text-anchor'].forEach(p=>{const v=cs.getPropertyValue(p);if(v)el.style.setProperty(p,v)});
+    if(el.tagName==='text'||el.tagName==='tspan')el.style.setProperty('font-family','Arial, Helvetica, sans-serif');
+   });
+   svg.removeAttribute('style');svg.setAttribute('width',w);svg.setAttribute('height',h);
+   xml=new XMLSerializer().serializeToString(svg);
+  }catch(e){xml=''}
+  if(prev===null)root.removeAttribute('data-theme');else root.setAttribute('data-theme',prev);
+  host.remove();
+  if(!xml)return resolve(null);
+  const img=new Image();
+  img.onload=()=>{
+   try{const k=2,c=document.createElement('canvas');c.width=w*k;c.height=h*k;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);resolve({url:c.toDataURL('image/png'),w,h})}
+   catch(e){resolve(null)}
+  };
+  img.onerror=()=>resolve(null);
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+ });
+}
+function buildPdf(blocks,img,name){
+ /* compress: without it the diagram is stored as raw pixels and the file runs to about 10 MB */
+ const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4',compress:true});
+ const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=40,CW=W-2*M,INK=[24,34,45],MUTED=[91,104,118],ACCENT=[31,79,138];
+ let y=M;
+ const room=need=>{if(y+need>H-M-12){doc.addPage();y=M}};
+ const text=(s,size,bold,ink,after)=>{
+  doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(...(ink||INK));
+  doc.splitTextToSize(pdfText(s),CW).forEach(line=>{room(size*1.35);doc.text(line,M,y+size);y+=size*1.35});
+  y+=after||0;
+ };
+ const table=(head,body)=>{
+  doc.autoTable({head:[head.map(pdfText)],body:body.map(r=>r.map(pdfText)),startY:y,margin:{left:M,right:M,top:M,bottom:M+8},theme:'grid',rowPageBreak:'avoid',
+   styles:{font:'helvetica',fontSize:8,cellPadding:3.5,overflow:'linebreak',textColor:INK,lineColor:[213,220,227],lineWidth:.5},
+   headStyles:{fillColor:ACCENT,textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[246,248,250]},
+   didParseCell:d=>{const ink=d.section==='body'&&PDF_INK[d.cell.raw];if(ink){d.cell.styles.textColor=ink;d.cell.styles.fontStyle='bold'}}});
+  y=doc.lastAutoTable.finalY+16;
+ };
+ blocks.forEach(b=>{
+  if(b.t==='title'){
+   text(b.sub.toUpperCase(),9,false,MUTED,6);text(b.x,24,true,INK,12);
+   doc.autoTable({body:b.meta.map(r=>r.map(pdfText)),startY:y,margin:{left:M,right:M},theme:'plain',styles:{font:'helvetica',fontSize:10,cellPadding:2.5,textColor:INK},columnStyles:{0:{cellWidth:130,textColor:MUTED}}});
+   y=doc.lastAutoTable.finalY+18;
+  }
+  else if(b.t==='h1'){
+   doc.addPage();y=M;text(b.x,18,true,ACCENT,2);
+   doc.setDrawColor(...ACCENT);doc.setLineWidth(1.2);doc.line(M,y+2,W-M,y+2);y+=16;
+  }
+  else if(b.t==='h2'){room(70);y+=4;text(b.x,12,true,INK,5)}
+  else if(b.t==='p')text(b.x,9.5,false,INK,6);
+  else if(b.t==='ul'){b.l.forEach(x=>text('-  '+x,9.5,false,INK,1));y+=5}
+  else if(b.t==='table'){if(b.body.length)table(b.head,b.body);else text('Nothing was entered in the form for this section.',9,false,MUTED,8)}
+  else if(b.t==='diagram'&&img){
+   const k=Math.min(CW/img.w,(H-2*M-40)/img.h),w=img.w*k,h=img.h*k;
+   room(h+8);doc.addImage(img.url,'PNG',M,y,w,h,undefined,'FAST');y+=h+14;
+  }
+ });
+ const pages=doc.getNumberOfPages();
+ for(let i=1;i<=pages;i++){
+  doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(...MUTED);
+  doc.text(pdfText(name+' · System Security Architecture Design'),M,H-20);
+  doc.text('Page '+i+' of '+pages,W-M,H-20,{align:'right'});
+ }
+ return doc.output('blob');
+}
+/* Hands a generated file to the viewer. Inside Claude a page cannot download by itself, so the save goes through the downloads capability. */
+async function saveFile(filename,blob){
+ if(window.claude&&typeof window.claude.use==='function'){
+  let dl=null;try{dl=await window.claude.use('downloads')}catch(e){}
+  if(!dl){toast('PDF export is not available in this view.');return}
+  try{await dl.save({filename,data:blob});toast('PDF saved')}
+  catch(e){const c=e&&e.code;toast(c==='declined'?'Export cancelled':c==='rate_limited'?'A save prompt is already open. Answer it, then try again.':c==='rejected_extension'||c==='extension_not_enabled'||c==='unavailable'?'PDF export is not available in this view.':'The PDF could not be saved. Try again.')}
+  return;
+ }
+ const u=URL.createObjectURL(blob),l=document.createElement('a');
+ l.href=u;l.download=filename;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
+ toast('PDF created');
+}
+async function exportPdf(){
+ if(!CTX&&!sys().snap){toast('Generate the HLD and LLD first');return}
+ if(!window.jspdf||!window.jspdf.jsPDF||typeof window.jspdf.jsPDF.API.autoTable!=='function'){toast('The PDF tools did not load. Check your connection and reload the page.');return}
+ toast('Preparing the PDF…');
+ try{
+  const d=withSnap(()=>({blocks:report(),svg:diagramSVG(),name:sysLabel()}));
+  const img=await diagramPNG(d.svg);
+  const blob=buildPdf(d.blocks,img,d.name);
+  const file=(d.name.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'system')+'-security-design.pdf';
+  await saveFile(file,blob);
+ }catch(e){toast('The PDF could not be created.')}
+}
+function renderExport(m){
+ const has=!!sys().snap;
+ m.innerHTML=`<div class="ex">
+ <div class="tile"><h3 style="font-size:17px">Design report</h3><p class="muted" style="margin:0;font-size:13px">HLD, LLD, threat model and required controls for ${esc(sys().a.sysName||'this system')} in one document, with the review decision and comments when there are any.</p>
+  ${has?`<div class="acts"><button class="btn primary" data-act="pdf">Export PDF</button><button class="btn" data-copy="mdout">Copy as Markdown</button></div><p class="muted" style="margin:0;font-size:12.5px">The PDF uses a Latin typeface. Text in other scripts, such as Arabic, is not shown in it; the Markdown copy keeps it.</p><textarea id="mdout" readonly aria-label="Markdown report">${esc(withSnap(md))}</textarea>`:`<div class="empty">Generate the HLD and LLD from the form first.</div>`}</div>
+ <div class="tile"><h3 style="font-size:17px">Saved forms (JSON)</h3><p class="muted" style="margin:0;font-size:13px">Copy to keep a backup of every form, or paste saved JSON to add those systems to your list.</p>
+  <div class="acts"><button class="btn primary" data-copy="jsonout">Copy JSON</button><button class="btn" data-act="load">Load pasted JSON</button><label class="btn" for="file">Load from file</label><input type="file" id="file" accept=".json,application/json" hidden></div>
+  <textarea id="jsonout" aria-label="Saved forms JSON">${esc(JSON.stringify({systems:S.systems},null,2))}</textarea></div></div>
+ <h3 style="font-size:19px;margin:24px 0 8px">Systems</h3>
+ <div class="tbl-wrap"><table><thead><tr><th>System</th><th>Type</th><th>Classification</th><th>Generated</th><th>Review</th><th class="num">Compliance</th><th class="num">Critical</th><th class="num">High</th><th></th></tr></thead><tbody>
+ ${S.systems.map((s,i)=>{const c=S.cur;S.cur=i;const r=s.snap?withSnap(()=>{const it=allItems(),f=findings(it).filter(x=>x.st!=='open');return{sc:score(it),c:f.filter(x=>x.sev==='C').length,h:f.filter(x=>x.sev==='H').length}}):null;S.cur=c;
+  return `<tr class="${i===S.cur?'cur':''}"><td><b>${esc(s.a.sysName||'Untitled system')}</b></td><td>${esc(s.a.sysType||'—')}</td><td>${esc(s.a.dataClass||'—')}</td><td class="mono" style="font-size:12px">${s.genAt?s.genAt.slice(0,10):'Not yet'}</td><td>${rpill(rstate(s.sub,REV[s.id]))}</td><td class="num">${r&&r.sc!=null?r.sc+'%':'–'}</td><td class="num bad">${r?r.c:'–'}</td><td class="num">${r?r.h:'–'}</td>
+  <td><span class="acts" style="margin:0;flex-wrap:nowrap" id="sa-${i}"><button class="btn sm" data-open="${i}">Open form</button><button class="btn sm" data-dup="${i}">Duplicate</button><button class="btn sm danger" data-askdel="${i}">Delete</button></span></td></tr>`}).join('')}
+ </tbody></table></div>
+ <div class="acts"><button class="btn" data-act="newsys">New blank form</button><button class="btn" data-act="samples">Add the sample system</button></div>`;
+}
+
+/* ============================== SHARED STORE ============================== */
+/* Where things are kept when a signed-in person opens the page in Claude:
+     designs/<owner id>/systems/<system id>   the form, the generated documents and the submitted version. The owner writes; the owner and cybersecurity read.
+     designs/<owner id>                       index of that owner's submitted designs, so cybersecurity can list them.
+     reviews/<owner id>/systems/<system id>   decision and comments. Cybersecurity writes; that owner reads.
+     reviews/<owner id>                       index of decisions, for the review queue.
+   "Cybersecurity" is anyone with Editor or Owner access to the page. Everyone else sees only their own designs.
+   Without the shared store the page works from this browser alone. */
+let CLOUD=null,SYNC='local',IDX=false;
+const DIRTY=new Set(),WRITING=new Set();
+let REV={},QUEUE=[],RIDX={};
+const SYNC_LABEL={local:'Saved in this browser only',connecting:'Connecting…',saved:'Saved',saving:'Saving…',error:'Not saved yet, retrying',failed:'Could not save this design',readonly:'View-only: saved in this browser only'};
+function setSync(v){SYNC=v;const e=document.getElementById('sync');if(e)e.textContent=SYNC_LABEL[v]}
+const hasWork=s=>Object.keys(s.a).length>0||s.comps.length>0;
+const toDoc=s=>clone({a:s.a,comps:s.comps,ifs:s.ifs,plan:s.plan||{},snap:s.snap||null,genAt:s.genAt||null,sub:s.sub||null,rev:s.rev||0});
+const fromDoc=(id,d)=>{const s=Object.assign({a:{},comps:[],ifs:[],plan:{}},clone(d),{id,example:false,cloud:true});s.a=s.a||{};s.comps=s.comps||[];s.ifs=s.ifs||[];s.plan=s.plan||{};return fixZones(s)};
+function touch(s){
+ if(!s||s.example)return;
+ s.rev=Date.now();
+ if(!CLOUD||CLOUD.readonly)return;
+ DIRTY.add(s.id);setSync('saving');clearTimeout(touch.t);touch.t=setTimeout(flush,1200);
+}
+function saveData(s){touch(s||sys());save()}
+function settle(){if(!DIRTY.size&&!WRITING.size&&SYNC==='saving')setSync('saved')}
+/* true = worth retrying later */
+function storeError(e){
+ const code=e&&e.code;
+ if(code==='invalid_argument'||code==='transform_error'){
+  if(CLOUD.canWrite===true){setSync('failed');return false}
+  CLOUD.readonly=true;DIRTY.clear();setSync('readonly');renderShell();return false;
+ }
+ if(code==='not_granted'||code==='revoked'||code==='capability_disabled'||code==='capability_removed'){CLOUD.readonly=true;DIRTY.clear();setSync('local');return false}
+ if(code==='quota_exceeded'){setSync('failed');return false}
+ setSync('error');clearTimeout(storeError.t);storeError.t=setTimeout(flush,20000);return true;
+}
+async function flush(){
+ for(const id of [...DIRTY])await pushSystem(id);
+ if(IDX)await pushIndex();
+}
+async function pushSystem(id){
+ if(!CLOUD||CLOUD.readonly||WRITING.has(id))return;
+ const s=S.systems.find(x=>x.id===id);
+ DIRTY.delete(id);
+ if(!s||s.example){settle();return}
+ WRITING.add(id);setSync('saving');
+ let ok=true;
+ try{await CLOUD.db.doc('designs/'+CLOUD.uid+'/systems/'+id).set(toDoc(s));s.cloud=true;save()}
+ catch(e){ok=false;if(storeError(e))DIRTY.add(id)}
+ WRITING.delete(id);
+ if(ok&&DIRTY.has(id))return pushSystem(id);
+ settle();return ok;
+}
+async function pushIndex(){
+ if(!CLOUD||CLOUD.readonly)return;
+ const items={};
+ S.systems.forEach(s=>{if(!s.example&&s.sub)items[s.id]={name:s.sub.a.sysName||'',proj:s.sub.a.projName||'',type:s.sub.a.sysType||'',cls:s.sub.a.dataClass||'',version:s.sub.version,at:s.sub.at}});
+ try{await CLOUD.db.doc('designs/'+CLOUD.uid).set({items,rev:Date.now()});IDX=false}
+ catch(e){IDX=true;storeError(e)}
+}
+/* My designs changed in the store (this tab, another tab or another device). A copy here that is newer, or still being saved, wins. */
+function onMine(qs){
+ const sure=!qs.metadata.fromCache,remote={},before=sys(),busy=id=>DIRTY.has(id)||WRITING.has(id),next=[];
+ qs.docs.forEach(d=>{if(d.exists)remote[d.id]=d.data()});
+ S.systems.forEach(s=>{
+  if(s.example){next.push(s);return}
+  const r=remote[s.id];delete remote[s.id];
+  if(r){
+   if(!busy(s.id)&&(r.rev||0)>(s.rev||0))next.push(fromDoc(s.id,r));
+   else{s.cloud=true;next.push(s)}
+  }
+  else if(s.cloud&&sure&&!busy(s.id)){/* deleted from another device: drop it here too */}
+  else{next.push(s);if(sure&&!s.cloud&&hasWork(s)&&!busy(s.id))touch(s)}
+ });
+ Object.keys(remote).forEach(id=>next.push(fromDoc(id,remote[id])));
+ if(sure&&CLOUD.first){CLOUD.first=false;if(next.some(s=>!s.example))for(let i=next.length-1;i>=0;i--)if(next[i].example)next.splice(i,1)}
+ if(!next.length)next.push(blankSystem());
+ S.systems=next;
+ const i=next.indexOf(before),j=next.findIndex(s=>s.id===before.id);
+ S.cur=i>=0?i:j>=0?j:0;
+ save();
+ if(CTX)return;
+ if(sys()!==before)keep();else renderShell();
+}
+function onMyReviews(qs){
+ REV={};qs.docs.forEach(d=>{if(d.exists)REV[d.id]=clone(d.data())});
+ if(CTX)return;
+ if(UI.tab==='form')renderShell();else keep();
+}
+function onQueue(qs){
+ QUEUE=[];
+ qs.docs.forEach(d=>{const it=(d.exists&&d.data().items)||{};Object.keys(it).forEach(id=>QUEUE.push(Object.assign({uid:d.id,id},it[id])))});
+ QUEUE.sort((p,q)=>String(q.at).localeCompare(String(p.at)));
+ if(UI.tab==='queue'&&!CTX)keep();else renderShell();
+}
+function onReviewIndex(qs){
+ RIDX={};qs.docs.forEach(d=>{if(d.exists)RIDX[d.id]=d.data().items||{}});
+ if(UI.tab==='queue'&&!CTX)keep();else renderShell();
+}
+function onStoreGone(e){if(e&&(e.code==='revoked'||e.code==='not_granted'))setSync('local')}
+async function connect(){
+ if(!window.claude||typeof window.claude.use!=='function')return;
+ setSync('connecting');
+ let db=null,user=null,uid=null,reviewer=false,canWrite=null;
+ try{[db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')])}catch(e){}
+ if(db&&user)try{uid=await user.id();reviewer=await user.canEdit();canWrite=await user.can('data.write')}catch(e){}
+ if(!db||!user||!uid){setSync('local');return}
+ /* this browser's copy belongs to whoever used it last: never show one person's designs to another */
+ if(S.uid&&S.uid!==uid){S.systems=[blankSystem()];S.cur=0}
+ S.uid=uid;save();
+ CLOUD={db,user,uid,reviewer,canWrite,readonly:canWrite===false&&!reviewer,first:true};
+ setSync(CLOUD.readonly?'readonly':'saved');
+ db.collection('designs/'+uid+'/systems').onSnapshot(onMine,onStoreGone);
+ db.collection('reviews/'+uid+'/systems').onSnapshot(onMyReviews,onStoreGone);
+ if(reviewer){
+  db.collection('designs').onSnapshot(onQueue,onStoreGone);
+  db.collection('reviews').onSnapshot(onReviewIndex,onStoreGone);
+ }
+ keep();
+}
+async function fillNames(){
+ if(!CLOUD)return;
+ const els=[...document.querySelectorAll('[data-uid]')];if(!els.length)return;
+ let ps={};try{ps=await CLOUD.user.profiles([...new Set(els.map(e=>e.dataset.uid))])}catch(e){}
+ els.forEach(e=>{const p=ps[e.dataset.uid];if(p)e.textContent=p.isMe?'you':(p.name||e.textContent)});
+}
+
+/* ============================== REVIEW ============================== */
+const DECISION={approved:'Approved',conditions:'Approved with conditions',returned:'Returned for changes',rejected:'Rejected'};
+const DPILL={approved:'met',conditions:'partial',returned:'partial',rejected:'gap',submitted:'sub',draft:'na'};
+const DOCS={hld:'HLD',lld:'LLD',threat:'Threat model',gaps:'Required controls',general:'General'};
+function rstate(sub,rv){
+ if(!sub)return{k:'draft',l:'Draft, not submitted'};
+ if(rv&&rv.decision&&rv.version===sub.version)return{k:rv.decision,l:DECISION[rv.decision]};
+ return{k:'submitted',l:'Version '+sub.version+' awaiting cybersecurity review'};
+}
+const rpill=st=>`<span class="pill ${DPILL[st.k]}">${st.l}</span>`;
+const docReview=()=>CTX?rstate(CTX.doc.sub,CTX.rev):rstate(sys().sub,REV[sys().id]);
+const activeReview=()=>CTX?CTX.rev:(REV[sys().id]||null);
+const day=t=>esc(String(t||'').slice(0,10));
+function commentHTML(c){
+ return `<li class="cm${c.done?' done':''}"><div class="cm-h"><b>${DOCS[c.doc]||'General'}${c.sec?' · section '+esc(c.sec):''}</b><span class="fw">version ${c.v||1} · <span data-uid="${esc(c.by)}">cybersecurity</span> · ${day(c.at)}</span>${c.done?'<span class="pill met">Resolved</span>':''}</div><p>${esc(c.text)}</p>${CTX?`<div class="acts"><button class="btn sm" data-cdone="${esc(c.id)}">${c.done?'Reopen':'Mark resolved'}</button><button class="btn sm danger" data-cdel="${esc(c.id)}">Delete</button></div>`:''}</li>`;
+}
+function addBox(doc){
+ return `<div class="rvadd"><input class="inp" id="cs-${doc}" data-draft placeholder="Section number (optional)" aria-label="Section number"><textarea class="ta" id="ct-${doc}" data-draft rows="3" placeholder="Comment for the project team" aria-label="Comment"></textarea><div><button class="btn primary" data-addc="${doc}">Add comment</button></div></div>`;
+}
+/* Shown under each generated document: the reviewer writes here, the project team reads here */
+function commentsHTML(doc){
+ const rv=activeReview(),list=rv?(rv.comments||[]).filter(c=>c.doc===doc):[];
+ if(!CTX&&!list.length)return '';
+ return `<section class="rvbox"><h3>Cybersecurity comments on the ${DOCS[doc]}</h3>${list.length?`<ul class="cms">${list.map(commentHTML).join('')}</ul>`:'<p class="muted">No comments on this document yet.</p>'}${CTX?addBox(doc):''}</section>`;
+}
+const RV_HEAD='font-size:11.5px;color:var(--muted);letter-spacing:.06em';
+function renderReview(m){
+ if(CTX)return renderDecision(m);
+ const s=sys(),rv=REV[s.id]||null,st=rstate(s.sub,rv),stale=isDirty();
+ const same=!!(s.snap&&s.sub)&&JSON.stringify([s.snap.a,s.snap.comps,s.snap.ifs])===JSON.stringify([s.sub.a,s.sub.comps,s.sub.ifs]);
+ let why='';
+ if(!CLOUD)why='Submitting needs the shared store, which is available when a signed-in person opens this page in Claude. Here your work stays in this browser; you can pass it on from Export &amp; systems.';
+ else if(CLOUD.readonly)why='You have view-only access to this page. Ask its owner for Contributor access so you can submit designs.';
+ else if(s.example)why='This is the sample system. Start a blank form, or duplicate the sample under Export &amp; systems, to submit a real design.';
+ else if(!s.snap)why='Generate the HLD and LLD from the form first.';
+ else if(stale)why='The form has changed since the HLD and LLD were generated. Generate again, then submit.';
+ else if(same)why='Version '+s.sub.version+' is with cybersecurity. To submit a new version, change the form and generate again.';
+ const steps=[['Fill in the form',!missingReq().length],['Generate HLD and LLD',!!s.snap],['Submit to cybersecurity',!!s.sub],['Cybersecurity review',!!s.sub&&st.k!=='submitted'],['Approved to implement',st.k==='approved'||st.k==='conditions']];
+ const cms=rv?(rv.comments||[]):[];
+ m.innerHTML=`<article class="doc">
+ <div class="doc-h"><div><div class="mono" style="${RV_HEAD}">CYBERSECURITY REVIEW · BEFORE IMPLEMENTATION</div><h2>${esc(s.a.sysName||'Untitled system')}</h2><div class="muted">Cybersecurity reviews the HLD and LLD before the system is built.</div></div><div>${rpill(st)}</div></div>
+ <ol class="steps">${steps.map(([n,ok])=>`<li class="${ok?'ok':''}">${n}</li>`).join('')}</ol>
+ <h3><span class="n">1</span>Submit for review</h3>
+ ${s.sub?`<p>Version ${s.sub.version} was submitted on ${day(s.sub.at)}.${s.sub.note?' Your note to the reviewer: “'+esc(s.sub.note)+'”':''}</p>`:''}
+ ${why?`<div class="empty">${why}</div>`:`<label class="lbl" for="subNote">Note to the reviewer (optional)</label><textarea class="ta" id="subNote" data-draft rows="3" placeholder="${s.sub?'What changed since the last version':'Anything the reviewer should know'}"></textarea>
+ <div class="acts"><button class="btn primary big" data-act="submit">Submit version ${(s.sub?s.sub.version:0)+1} to cybersecurity</button></div>
+ <p class="muted" style="font-size:12.5px">Cybersecurity will see the HLD, LLD, threat model and required controls as generated on ${day(s.genAt)}. Later changes to the form are not sent until you submit again.</p>`}
+ <h3><span class="n">2</span>Cybersecurity decision</h3>
+ ${rv&&rv.decision?`<div class="decision"><div><span class="pill ${DPILL[rv.decision]}">${DECISION[rv.decision]}</span> <span class="fw">version ${rv.version} · <span data-uid="${esc(rv.by)}">cybersecurity</span> · ${day(rv.at)}</span>${s.sub&&rv.version!==s.sub.version?' <span class="fw">(decision on an earlier version)</span>':''}</div><p>${esc(rv.summary||'No summary was given.')}</p></div>`:'<p class="muted">No decision has been recorded yet.</p>'}
+ <h3><span class="n">3</span>Reviewer comments <span class="n">${cms.filter(c=>!c.done).length} open</span></h3>
+ ${cms.length?`<ul class="cms">${cms.map(commentHTML).join('')}</ul>`:'<p class="muted">No comments yet.</p>'}
+ </article>`;
+}
+function renderDecision(m){
+ const d=CTX.doc,rv=CTX.rev,st=rstate(d.sub,rv),now=rv.version===d.sub.version,cms=rv.comments||[];
+ m.innerHTML=`<article class="doc">
+ <div class="doc-h"><div><div class="mono" style="${RV_HEAD}">CYBERSECURITY REVIEW · DECISION</div><h2>${esc(sysLabel())}</h2><div class="muted">Version ${d.sub.version} · submitted by <span data-uid="${esc(CTX.uid)}">a colleague</span> on ${day(d.sub.at)}</div></div><div>${rpill(st)}</div></div>
+ ${d.sub.note?`<p><b>Note from the project:</b> ${esc(d.sub.note)}</p>`:''}
+ ${rv.decision&&!now?`<p class="muted">Version ${rv.version} was recorded as “${DECISION[rv.decision]}” on ${day(rv.at)}. This is a newer version and needs its own decision.</p>`:''}
+ <h3><span class="n">1</span>Decision on version ${d.sub.version}</h3>
+ <label class="lbl" for="rvDecision">Decision</label>
+ <select class="inp" id="rvDecision"><option value="">Select a decision…</option>${Object.entries(DECISION).map(([k,n])=>`<option value="${k}" ${now&&rv.decision===k?'selected':''}>${n}</option>`).join('')}</select>
+ <label class="lbl" for="rvSummary">Summary for the project team</label>
+ <textarea class="ta" id="rvSummary" data-draft rows="4" placeholder="Conditions, required changes or reasons">${now?esc(rv.summary||''):''}</textarea>
+ <div class="acts"><button class="btn primary big" data-act="decide">${now&&rv.decision?'Update decision':'Record decision'}</button></div>
+ <h3><span class="n">2</span>All comments <span class="n">${cms.filter(c=>!c.done).length} open</span></h3>
+ ${cms.length?`<ul class="cms">${cms.map(commentHTML).join('')}</ul>`:'<p class="muted">No comments yet. Add them under each document, or add a general one here.</p>'}
+ ${addBox('general')}
+ </article>`;
+}
+function renderQueue(m){
+ const rows=QUEUE.map(q=>{const ri=(RIDX[q.uid]||{})[q.id];return Object.assign({st:rstate({version:q.version},ri),n:ri?ri.n||0:0},q)});
+ const waiting=rows.filter(r=>r.st.k==='submitted'),list=UI.qf==='all'?rows:waiting;
+ m.innerHTML=`<div class="pf-head"><div><div class="eyebrow">Cybersecurity</div><h2>Designs submitted for review</h2></div></div>
+ <div class="filters"><button class="chipf" data-qf="waiting" aria-pressed="${UI.qf!=='all'}">Awaiting review (${waiting.length})</button><button class="chipf" data-qf="all" aria-pressed="${UI.qf==='all'}">All submitted (${rows.length})</button></div>
+ <div class="tbl-wrap"><table><thead><tr><th>System</th><th>Type</th><th>Classification</th><th>Submitted by</th><th>Submitted</th><th class="num">Version</th><th>Status</th><th class="num">Open comments</th><th></th></tr></thead><tbody>
+ ${list.length?list.map(r=>`<tr><td><b>${esc(r.name||'Untitled system')}</b><div class="muted" style="font-size:12px">${esc(r.proj||'')}</div></td><td>${esc(r.type||'—')}</td><td>${esc(r.cls||'—')}</td><td><span data-uid="${esc(r.uid)}">A colleague</span></td><td class="mono" style="font-size:12px">${day(r.at)}</td><td class="num">${esc(r.version)}</td><td>${rpill(r.st)}</td><td class="num">${r.n}</td><td><button class="btn sm primary" data-rv="${esc(r.uid)}|${esc(r.id)}">Review</button></td></tr>`).join(''):`<tr><td colspan="9" style="padding:24px;text-align:center" class="muted">${rows.length?'Nothing is waiting for review.':'No designs have been submitted yet.'}</td></tr>`}
+ </tbody></table></div>
+ <p class="disclaimer">You see this queue because you have Editor or Owner access to this page. People with Contributor access can fill in and submit designs, and see only their own.</p>`;
+}
+async function openSubmission(uid,id){
+ if(!CLOUD)return;
+ try{
+  const [d,r]=await Promise.all([CLOUD.db.doc('designs/'+uid+'/systems/'+id).get(),CLOUD.db.doc('reviews/'+uid+'/systems/'+id).get()]);
+  if(!d.exists||!d.data().sub){toast('This design is no longer available');return}
+  const doc=fixZones(clone(d.data())),rev=r.exists?clone(r.data()):{};
+  rev.comments=rev.comments||[];
+  CTX={uid,id,doc,rev,view:{a:doc.sub.a||{},comps:doc.sub.comps||[],ifs:doc.sub.ifs||[]}};
+  UI.tab='hld';render();window.scrollTo(0,0);
+ }catch(e){toast('Could not open the design. Try again.')}
+}
+async function saveReview(msg){
+ const rv=CTX.rev,base='reviews/'+CTX.uid;
+ try{
+  await CLOUD.db.doc(base+'/systems/'+CTX.id).set(clone(rv));
+  const item={version:rv.version||0,decision:rv.decision||'',at:rv.at||'',n:rv.comments.filter(c=>!c.done).length};
+  const ref=CLOUD.db.doc(base),ex=await ref.get();
+  if(ex.exists)await ref.update({items:{[CTX.id]:item}});else await ref.set({items:{[CTX.id]:item}});
+  if(msg)toast(msg);
+ }catch(e){toast('The review could not be saved. Check your access and try again.')}
+ if(CTX)keep();
+}
+async function submitDesign(){
+ const s=sys();
+ if(!CLOUD||CLOUD.readonly||s.example||!s.snap||isDirty())return;
+ const n=document.getElementById('subNote'),note=n?n.value.trim():'';
+ if(n)n.value='';
+ s.sub={a:clone(s.snap.a),comps:clone(s.snap.comps),ifs:clone(s.snap.ifs),version:(s.sub?s.sub.version:0)+1,at:new Date().toISOString(),note};
+ saveData(s);clearTimeout(touch.t);IDX=true;
+ const ok=await pushSystem(s.id);
+ if(ok!==false)await pushIndex();
+ keep();
+ toast(ok===false?'Saved here, but the shared store could not be reached. It will try again.':'Version '+s.sub.version+' submitted to cybersecurity');
+}
+function removeSystem(i){
+ const s=S.systems[i];
+ S.systems.splice(i,1);
+ if(!S.systems.length)S.systems.push(blankSystem());
+ S.cur=Math.min(S.cur,S.systems.length-1);save();
+ if(CLOUD&&!CLOUD.readonly&&s&&s.cloud){DIRTY.delete(s.id);CLOUD.db.doc('designs/'+CLOUD.uid+'/systems/'+s.id).delete().then(()=>{if(s.sub)pushIndex()},()=>{})}
+}
+
+/* ============================== EVENTS ============================== */
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)}
+function setTab(t){UI.tab=t;save();try{history.replaceState(null,'','#'+t)}catch(e){}render();window.scrollTo(0,0)}
+/* Re-render in place: keeps the scroll position and anything typed into a draft box */
+function keep(){
+ const y=window.scrollY,d={};
+ document.querySelectorAll('[data-draft]').forEach(e=>{if(e.id&&e.value)d[e.id]=e.value});
+ render();
+ Object.keys(d).forEach(id=>{const e=document.getElementById(id);if(e)e.value=d[id]});
+ window.scrollTo(0,y);
+}
+function newSystem(){CTX=null;S.systems.push(blankSystem());S.cur=S.systems.length-1;UI.err=false;save();setTab('form');toast('Blank form ready')}
+document.addEventListener('submit',e=>{e.preventDefault();if(e.target.id==='frm')generate()});
+document.addEventListener('click',e=>{
+ const t=e.target.closest('button,a[data-tab]');if(!t)return;const ds=t.dataset;
+ if(ds.tab){e.preventDefault();return setTab(ds.tab)}
+ if(ds.jump){const el=document.getElementById(ds.jump);if(el)el.scrollIntoView({block:'start'});return}
+ if(ds.f&&ds.v){const a=sys().a;a[ds.f]=a[ds.f]===ds.v?'':ds.v;saveData();keep();return}
+ if(ds.m){const a=sys().a,arr=Array.isArray(a[ds.m])?a[ds.m]:[];a[ds.m]=arr.includes(ds.v)?arr.filter(x=>x!==ds.v):[...arr,ds.v];saveData();keep();return}
+ if(ds.rdel){const[k,i]=ds.rdel.split(':');sys()[k].splice(+i,1);saveData();keep();return}
+ if(ds.sev){UI.sev=ds.sev;save();keep();return}
+ if(ds.cst){UI.cst=ds.cst;save();keep();return}
+ if(ds.lay){UI.lay=ds.lay;save();keep();return}
+ if(ds.fwf){UI.fw=ds.fwf;save();keep();return}
+ if(ds.tm){UI.tm=ds.tm;save();keep();return}
+ if(ds.ts){UI.ts=ds.ts;save();keep();return}
+ if(ds.qf){UI.qf=ds.qf;save();keep();return}
+ if(ds.rv){const[u,id]=ds.rv.split('|');openSubmission(u,id);return}
+ if(ds.addc){
+  if(!CTX)return;
+  const ta=document.getElementById('ct-'+ds.addc),se=document.getElementById('cs-'+ds.addc),text=ta?ta.value.trim():'';
+  if(!text){toast('Write the comment first');return}
+  CTX.rev.comments.push({id:uid(),doc:ds.addc,sec:se?se.value.trim():'',text,by:CLOUD.uid,at:new Date().toISOString(),v:CTX.doc.sub.version,done:false});
+  ta.value='';if(se)se.value='';
+  saveReview('Comment added');return;
+ }
+ if(ds.cdone||ds.cdel){
+  if(!CTX)return;
+  const id=ds.cdone||ds.cdel,i=CTX.rev.comments.findIndex(c=>c.id===id);if(i<0)return;
+  if(ds.cdel)CTX.rev.comments.splice(i,1);else CTX.rev.comments[i].done=!CTX.rev.comments[i].done;
+  saveReview(ds.cdel?'Comment deleted':'');return;
+ }
+ if(ds.open!==undefined){S.cur=+ds.open;UI.err=false;save();setTab('form');return}
+ if(ds.dup!==undefined){const c=clone(S.systems[+ds.dup]);c.id=uid();c.example=false;c.a.sysName=(c.a.sysName||'System')+' (copy)';['snap','genAt','sub','cloud','rev'].forEach(k=>delete c[k]);S.systems.push(c);S.cur=S.systems.length-1;saveData(c);setTab('form');toast('Form duplicated');return}
+ if(ds.askdel!==undefined){const i=+ds.askdel;document.getElementById('sa-'+i).innerHTML=`<span class="confirm">Delete? <button class="btn sm danger" data-del="${i}">Delete</button><button class="btn sm" data-act="cancel">Keep</button></span>`;return}
+ if(ds.del!==undefined){removeSystem(+ds.del);render();toast('System deleted');return}
+ if(ds.copy){const ta=document.getElementById(ds.copy);
+  try{navigator.clipboard.writeText(ta.value).then(()=>toast('Copied to clipboard'),()=>{ta.select();toast('Press Ctrl+C to copy the selected text')})}catch(err){ta.select();toast('Press Ctrl+C to copy the selected text')}return}
+ const act=ds.act;if(!act)return;
+ if(act==='newsys')return newSystem();
+ if(act==='generate')return generate();
+ if(act==='pdf')return exportPdf();
+ if(act==='submit')return submitDesign();
+ if(act==='closerv'){CTX=null;UI.tab='queue';render();window.scrollTo(0,0);return}
+ if(act==='decide'){
+  if(!CTX)return;
+  const d=document.getElementById('rvDecision').value;
+  if(!d){toast('Select a decision first');return}
+  Object.assign(CTX.rev,{decision:d,summary:document.getElementById('rvSummary').value.trim(),version:CTX.doc.sub.version,by:CLOUD.uid,at:new Date().toISOString()});
+  saveReview('Decision recorded: '+DECISION[d]);return;
+ }
+ if(act==='addcomp'){sys().comps.push({n:'Component '+(sys().comps.length+1),tier:'Application',tech:'',zone:'Application zone',host:'',port:''});saveData();keep();return}
+ if(act==='addif'){const c=sys().comps;sys().ifs.push({from:c[0]?c[0].n:'',to:c[1]?c[1].n:'',proto:'HTTPS',port:'443',cls:sys().a.dataClass||'Restricted',enc:'TLS 1.2',auth:'OAuth2 / OIDC'});saveData();keep();return}
+ if(act==='seed'){(TEMPLATES[sys().a.sysType]||[]).forEach(([n,tier,zone])=>{if(!sys().comps.some(c=>lc(c.n)===lc(n)))sys().comps.push({n,tier,tech:'',zone,host:'',port:''})});saveData();keep();toast('Typical components added');return}
+ if(act==='cancel'){render();return}
+ if(act==='samples'){S.systems.push(...sampleSystems());save();render();toast('Sample system added');return}
+ if(act==='load'){loadJSON(document.getElementById('jsonout').value);return}
+});
+/* Adds the systems in a saved file to the list (one with the same id replaces the copy here) */
+function loadJSON(txt){
+ try{const o=JSON.parse(txt);const list=Array.isArray(o.systems)?o.systems:(o&&o.a?[o]:null);if(!list||!list.length)throw 0;
+  list.forEach(s=>{s.id=s.id||uid();s.a=s.a||{};s.comps=s.comps||[];s.ifs=s.ifs||[];s.plan=s.plan||{};delete s.cloud;fixZones(s)});
+  const ids=new Set(list.map(s=>s.id)),kept=S.systems.filter(s=>!ids.has(s.id));
+  S.systems=[...kept,...list];S.cur=kept.length;
+  list.forEach(s=>touch(s));save();render();toast(list.length+' system(s) loaded')}
+ catch(e){toast('That text is not a saved form. Paste the JSON copied from this page.')}
+}
+document.addEventListener('change',e=>{
+ const t=e.target;
+ if(t.id==='sysSel'){S.cur=+t.value;UI.err=false;save();t.blur();render();return}
+ if(t.id==='file'&&t.files[0]){const r=new FileReader();r.onload=()=>loadJSON(r.result);r.readAsText(t.files[0]);return}
+ if(t.tagName==='SELECT'&&t.dataset.f){sys().a[t.dataset.f]=t.value;saveData();keep();return}
+ if(t.dataset.ct&&t.tagName==='SELECT'){sys()[t.dataset.ct][+t.dataset.i][t.dataset.k]=t.value;saveData();return}
+});
+/* Typing never re-renders the form (a re-render on blur would swallow the click that caused the blur); only names and row state are patched in place. */
+function refreshNames(){
+ const o=document.getElementById('sysSel').options[S.cur];if(o)o.textContent=sys().a.sysName||'Untitled system';
+ document.getElementById('endpoints').innerHTML=[...ACTORS,...sys().comps.map(c=>c.n)].filter(Boolean).map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+document.addEventListener('input',e=>{
+ const t=e.target;
+ if(t.tagName==='INPUT'&&t.dataset.f){sys().a[t.dataset.f]=t.value;saveData();
+  if(t.dataset.f==='sysName')refreshNames();
+  const f=FMAP[t.dataset.f],row=f&&document.getElementById('row-'+f.id);if(row&&f.c)row.className='q st-'+statusOf(f);
+  return}
+ if(t.tagName==='INPUT'&&t.dataset.ct){sys()[t.dataset.ct][+t.dataset.i][t.dataset.k]=t.value;saveData();if(t.dataset.k==='n')refreshNames();return}
+ if(t.dataset.plan&&!CTX){const p=sys().plan[t.dataset.plan]=sys().plan[t.dataset.plan]||{};p[t.dataset.k]=t.value;saveData();return}
+});
+render();
+connect();
+</script>
+
+</body></html>
