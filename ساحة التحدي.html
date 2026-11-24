@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Majlis Trivia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a loud, warm party game for a diwaniya night — two teams, one host, lots of shouting.
+   IDEA: an Al Sadu woven rug laid on the floor; the board is the weave, tiles are knots.
+   PICTURE: the 6×6 board itself, framed top and bottom by a woven Sadu band.
+   COLOUR and TYPE: Sadu red dominant, near-black wool ground, cream thread; team colours ochre and teal. Lalezar + Cairo.
+   LAYOUT: scores on the frame, board fills the screen, a question opens as a full overlay. */
+:root{color-scheme:light dark;
+--bg:light-dark(#f4e9d8,#1a100d);--ink:light-dark(#221410,#f4e9d8);--soft:light-dark(#6b5546,#bfa995);
+--card:light-dark(#fffaf1,#28181290);--line:light-dark(#e0cdb3,#3d2a22);
+--red:#b3261e;--red2:#8e1b15;--cream:#f4e9d8;--a:#d99a2b;--b:#2f8a86}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Cairo,system-ui,sans-serif;overflow-x:clip;min-height:100vh}
+.sadu{height:22px;background:var(--red) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='22'%3E%3Cpath d='M0 22 11 0 22 22Z' fill='%231a100d'/%3E%3Cpath d='M22 0 33 22 44 0Z' fill='%231a100d'/%3E%3Cpath d='M11 8 15 15 11 22 7 15Z' fill='%23f4e9d8'/%3E%3Cpath d='M33 0 37 7 33 14 29 7Z' fill='%23f4e9d8'/%3E%3C/svg%3E") repeat-x;border-block:3px solid var(--cream)}
+h1,h2,h3,.disp{font-family:Lalezar,Cairo,sans-serif;font-weight:400;line-height:1.05;margin:0}
+button,input,select{font:inherit;font-size:16px}
+button{cursor:pointer;border:0;border-radius:12px;min-height:44px;padding:8px 18px;font-weight:800}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--a);outline-offset:2px}
+.btn{background:var(--red);color:var(--cream)}.btn:hover{background:var(--red2)}
+.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.wrap{max-width:1240px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,14px)}
+.hide{display:none!important}
+/* setup */
+.setup{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:center;min-height:calc(100vh - 50px)}
+.hero h1{font-size:clamp(44px,8vw,88px);color:var(--red)}
+.hero p{font-size:17px;max-width:52ch;color:var(--soft)}
+.rules{display:grid;gap:8px;margin:18px 0 0;padding:0;list-style:none}
+.rules li{padding-inline-start:26px;position:relative}
+.rules li::before{content:"";position:absolute;inset-inline-start:4px;top:9px;width:10px;height:10px;background:var(--red);transform:rotate(45deg)}
+form.panel{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:clamp(18px,3vw,28px);display:grid;gap:14px}
+label{display:grid;gap:4px;font-weight:600;font-size:14px}
+input,select{width:100%;min-height:46px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.note{font-size:13px;color:var(--soft);margin:0}
+/* top bar */
+.bar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center}
+.team{background:var(--card);border:3px solid var(--line);border-radius:16px;padding:10px 14px;display:grid;gap:4px}
+.team.on{border-color:var(--tc);box-shadow:0 0 0 4px color-mix(in srgb,var(--tc) 25%,transparent)}
+.team .nm{font-weight:800;display:flex;gap:8px;align-items:center;justify-content:space-between}
+.team .sc{font-family:Lalezar,sans-serif;font-size:clamp(30px,5vw,44px);line-height:1;color:var(--tc)}
+.team .adj{display:flex;gap:6px}.team .adj button{min-height:32px;padding:2px 10px;border-radius:8px;background:transparent;border:2px solid var(--line);color:var(--ink)}
+.pills{display:flex;gap:4px;flex-wrap:wrap}
+.pill{font-size:12px;padding:1px 8px;border-radius:99px;background:color-mix(in srgb,var(--tc) 20%,transparent);font-weight:600}
+.pill.x{opacity:.35;text-decoration:line-through}
+.mid{text-align:center}.mid h2{font-size:clamp(20px,3vw,30px);color:var(--red)}.mid .turn{font-size:14px;color:var(--soft)}
+/* board */
+.board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-top:18px}
+.cat{background:var(--card);border:2px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.cat h3{background:var(--red);color:var(--cream);font-size:clamp(17px,1.8vw,22px);padding:14px 10px;text-align:center;min-height:78px;display:grid;place-items:center;text-wrap:balance}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px}
+.tile{font-family:Lalezar,sans-serif;font-size:22px;font-weight:400;background:#1a100d;color:var(--cream);border-radius:10px;min-height:52px;border-bottom:4px solid var(--red)}
+.tile:hover:not(:disabled){background:var(--red);transform:translateY(-1px)}
+.tile:disabled{cursor:default;background:transparent;color:var(--soft);border:2px dashed var(--line);font-size:15px}
+.tile.ta{color:var(--a);border-color:var(--a)}.tile.tb{color:var(--b);border-color:var(--b)}
+.picker{display:grid;gap:8px}.picker .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.picker .hd button{min-height:36px;padding:4px 12px;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:38px;padding:4px 12px;border-radius:99px;background:transparent;color:var(--ink);border:2px solid var(--line);font-weight:600;font-size:14px}
+.chip[aria-pressed=true]{background:var(--red);border-color:var(--red);color:var(--cream)}
+.swap{margin:0 8px 8px;min-height:36px;font-size:13px;background:transparent;color:var(--soft);border:2px solid var(--line)}
+.tools{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+/* loading */
+.load{min-height:70vh;display:grid;place-items:center;text-align:center}
+.loom{display:flex;gap:6px;justify-content:center;margin:20px 0}
+.loom i{width:18px;height:18px;background:var(--red);transform:rotate(45deg);animation:k 1.2s infinite ease-in-out}
+.loom i:nth-child(2){animation-delay:.15s;background:var(--a)}.loom i:nth-child(3){animation-delay:.3s}.loom i:nth-child(4){animation-delay:.45s;background:var(--b)}
+@keyframes k{50%{transform:rotate(45deg) scale(.4)}}
+/* question */
+.q{position:fixed;inset:0;background:var(--bg);z-index:5;overflow:auto;display:flex;flex-direction:column}
+.qin{flex:1;display:grid;gap:18px;align-content:center;max-width:900px;margin:0 auto;padding:24px max(4vw,14px);width:100%;text-align:center}
+.qmeta{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-weight:800}
+.qmeta span{background:var(--red);color:var(--cream);padding:4px 14px;border-radius:99px}
+.qtext{font-size:clamp(24px,4vw,40px);font-weight:800;line-height:1.25;text-wrap:balance}
+.clock{font-family:Lalezar,sans-serif;font-size:clamp(48px,9vw,80px);line-height:1;color:var(--tc)}
+.clock.low{color:var(--red);animation:p .5s infinite alternate}@keyframes p{to{opacity:.4}}
+.phase{font-weight:600;color:var(--soft)}
+.ans{font-family:Lalezar,sans-serif;font-size:clamp(30px,5vw,52px);color:var(--cream);background:var(--red);border-radius:16px;padding:14px 18px;line-height:1.15}
+.lifes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.lifes button{background:transparent;color:var(--ink);border:2px solid var(--tc);font-size:14px}
+.lifes button:disabled{opacity:.35;cursor:default}
+.flags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:28px}
+.flags b{background:var(--tc);color:#1a100d;padding:2px 12px;border-radius:99px;font-size:14px}
+.award{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.award .A{background:var(--a);color:#1a100d}.award .B{background:var(--b);color:#fff}
+/* end */
+.end{text-align:center;min-height:70vh;display:grid;place-content:center;gap:16px}
+.end h1{font-size:clamp(48px,9vw,96px);color:var(--red)}
+.err{background:color-mix(in srgb,var(--red) 15%,transparent);border-radius:12px;padding:10px 14px;font-size:14px}
+@media(max-width:1000px){.board{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.setup{grid-template-columns:1fr}.board{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.bar{grid-template-columns:1fr 1fr}.mid{grid-column:1/-1;order:-1}.cat h3{min-height:64px;font-size:16px}.tile{font-size:18px;min-height:46px}.row2{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="sadu"></div>
+
+<main id="vSetup" class="wrap">
+  <div class="setup">
+    <section class="hero">
+      <h1 id="tTitle">Majlis Trivia</h1>
+      <p id="tLead">Two teams, six categories, thirty-six questions. Pick your categories; every game brings brand-new questions you haven't seen before.</p>
+      <ul class="rules" id="tRules"></ul>
+    </section>
+    <form class="panel" id="fSetup">
+      <div class="row2">
+        <label><span id="lA">Team 1</span><input id="iA" maxlength="24" value="الصقور"></label>
+        <label><span id="lB">Team 2</span><input id="iB" maxlength="24" value="اللؤلؤ"></label>
+      </div>
+      <div class="row2">
+        <label><span id="lLang">Language</span><select id="iLang"><option value="ar" selected>العربية</option><option value="en">English</option></select></label>
+        <label><span id="lDiff">Difficulty</span><select id="iDiff"><option value="mixed">Mixed</option><option value="easy">Easy</option><option value="hard">Hard</option></select></label>
+      </div>
+      <div class="picker"><div class="hd"><span id="lPick"></span><button type="button" class="ghost" id="bRnd"></button></div><div class="chips" id="chips"></div></div>
+      <label><span id="lTime">Seconds to answer</span><select id="iTime"><option>30</option><option selected>60</option><option>90</option></select></label>
+      <button class="btn" id="bGo" type="submit">Generate a new board</button>
+      <p class="note" id="nRecent"></p>
+      <div id="eSetup" class="err hide"></div>
+    </form>
+  </div>
+</main>
+
+<main id="vLoad" class="wrap load hide"><div><h2 class="disp" style="font-size:clamp(30px,5vw,48px)" id="tWeave">Weaving your board…</h2><div class="loom"><i></i><i></i><i></i><i></i></div><p id="pLoad" class="note">Writing questions</p></div></main>
+
+<main id="vBoard" class="wrap hide">
+  <div class="bar">
+    <div class="team" id="T0" style="--tc:var(--a)"></div>
+    <div class="mid"><h2 id="tTitle2">Majlis Trivia</h2><div class="turn" id="turnL"></div></div>
+    <div class="team" id="T1" style="--tc:var(--b)"></div>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="tools"><button class="ghost" id="bEnd">End game</button><button class="ghost" id="bNew">New game</button></div>
+  <p class="note" id="nSrc" style="text-align:center;margin-top:10px"></p>
+</main>
+
+<main id="vEnd" class="wrap hide"><div class="end"><p class="note" id="tWin">Winner</p><h1 id="winN"></h1><p id="winS" class="disp" style="font-size:28px"></p><div><button class="btn" id="bAgain">Play again — new questions</button></div></div></main>
+
+<div class="q hide" id="vQ">
+  <div class="sadu"></div>
+  <div class="qin" id="qin">
+    <div class="qmeta"><span id="qCat"></span><span id="qPts"></span></div>
+    <div class="phase" id="qPhase"></div>
+    <div class="clock" id="qClock"></div>
+    <div class="qtext" id="qText"></div>
+    <div class="flags" id="qFlags"></div>
+    <div class="lifes" id="qLifes"></div>
+    <div class="ans hide" id="qAns"></div>
+    <div><button class="btn" id="bReveal">Reveal answer</button></div>
+    <div class="award hide" id="qAward"></div>
+    <div><button class="ghost" id="bBack">Back to board</button></div>
+  </div>
+  <div class="sadu"></div>
+</div>
+
+<div class="sadu"></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+const L={
+en:{title:'Majlis Trivia',lead:"Two teams, six categories, thirty-six questions. Pick your categories; every game brings brand-new questions you haven't seen before.",
+rules:['Teams take turns picking any tile: 200, 400 or 600 points.','Answer before the clock runs out, or the other team gets a short chance to steal.','Each team has three lifelines: Call a friend (+30s), Two answers, and The Pit — answer right and the other team loses the same points.','Most points when the board is empty wins.'],
+A:'Team 1',B:'Team 2',lang:'Language',diff:'Difficulty',theme:'Lean toward (optional)',time:'Seconds to answer',go:'Generate a new board',
+weave:'Weaving your board…',writing:(n)=>`Writing question ${n} of 36`,thinking:'Preparing questions',turn:n=>`${n} to pick`,end:'End game',newg:'New game',
+reveal:'Reveal answer',back:'Back to board',who:'Who got it?',nobody:'Nobody',steal:n=>`Steal chance: ${n}`,answering:n=>`${n} answering`,timeup:"Time's up",
+call:'Call a friend',two:'Two answers',pit:'The Pit',callF:'+30 seconds',twoF:'Two guesses allowed',pitF:'The Pit is open',win:'Winner',tie:"It's a tie",again:'Play again — new questions',
+swap:'New questions',recent:n=>`${n} past questions remembered so they won't repeat.`,pick:n=>`Pick 6 categories (${n}/6)`,rnd:'Random',
+srcAI:'',srcBank:'',ph:'e.g. Kuwait, 90s cartoons, football, food',
+fail:'Could not generate a board right now. Try again, or play with the built-in questions.',bank:'Play with built-in questions',pts:'points'},
+ar:{title:'ساحة التحدي',lead:'فريقين، ست فئات، ست وثلاثين سؤال. اختاروا فئاتكم، وكل لعبة أسئلة جديدة ما انسألت قبل.',
+rules:['كل فريق بدوره يختار أي سؤال: ٢٠٠ أو ٤٠٠ أو ٦٠٠ نقطة.','جاوب قبل ما يخلص الوقت، وإلا الفريق الثاني ياخذ فرصة يسرق.','لكل فريق ٣ وسائل مساعدة: اتصال بصديق (+٣٠ ثانية)، جوابين، والحفرة — إذا جاوبت صح ينخصم نفس النقاط من الفريق الثاني.','الفريق اللي عنده أكثر نقاط بنهاية اللوحة يفوز.'],
+A:'الفريق ١',B:'الفريق ٢',lang:'اللغة',diff:'الصعوبة',theme:'مواضيع مفضلة (اختياري)',time:'ثواني الإجابة',go:'لعبة جديدة',
+weave:'قاعدين نزبط اللعبة…',writing:(n)=>`نكتب السؤال ${n} من ٣٦`,thinking:'نجهز الأسئلة',turn:n=>`دور ${n}`,end:'إنهاء اللعبة',newg:'لعبة جديدة',
+reveal:'اكشف الإجابة',back:'رجوع للوحة',who:'منو جاوب صح؟',nobody:'ولا أحد',steal:n=>`فرصة سرقة: ${n}`,answering:n=>`${n} يجاوب`,timeup:'خلص الوقت',
+call:'اتصال بصديق',two:'جوابين',pit:'الحفرة',callF:'+٣٠ ثانية',twoF:'مسموح جوابين',pitF:'الحفرة مفتوحة',win:'الفائز',tie:'تعادل',again:'العب مرة ثانية — أسئلة جديدة',
+swap:'أسئلة جديدة',recent:n=>`محفوظ ${n} سؤال سابق عشان ما تتكرر.`,pick:n=>`اختاروا ٦ فئات (${n}/٦)`,rnd:'عشوائي',
+srcAI:'',srcBank:'',ph:'مثلاً: الكويت، رسوم التسعينات، كورة، أكل',
+fail:'ما قدرنا نولد لوحة الحين. جرّب مرة ثانية أو العب بالأسئلة المدمجة.',bank:'العب بالأسئلة المدمجة',pts:'نقطة'}};
+
+// Built-in fallback bank (English): [name, [q,a] x6 in order 200,200,400,400,600,600]
+const BANK=[
+['Space',[['Which planet is known as the Red Planet?','Mars'],["What is the name of Earth's natural satellite?",'The Moon'],['Which planet has the most prominent ring system?','Saturn'],['Who was the first person to walk on the Moon?','Neil Armstrong'],['What is the largest volcano in the Solar System, found on Mars?','Olympus Mons'],['Which probe launched in 1977 is the most distant human-made object?','Voyager 1']]],
+['Around the Gulf',[['What is the capital of Kuwait?','Kuwait City'],['What currency is used in Saudi Arabia?','Saudi riyal'],["What is the name of the world's tallest building, in Dubai?",'Burj Khalifa'],['Muscat is the capital of which country?','Oman'],["What is Kuwait's largest island?",'Bubiyan'],['In which year did Kuwait gain independence?','1961']]],
+['Kitchen',[['Sushi comes from which country?','Japan'],['What is the main ingredient in hummus?','Chickpeas'],['Which golden spice is the most expensive by weight?','Saffron'],['Guacamole is made mainly from which fruit?','Avocado'],['Which Italian cheese is used in tiramisu?','Mascarpone'],['Marzipan is made mainly from which nut?','Almond']]],
+['Animal Kingdom',[['What is the fastest land animal?','Cheetah'],['What is the largest animal on Earth?','Blue whale'],['How many hearts does an octopus have?','Three'],['What is a group of lions called?','A pride'],['Which egg-laying mammal has a duck-like bill?','Platypus'],['What does a camel store in its hump?','Fat']]],
+['Football',[['How many players per team are on the pitch?','11'],['Which country won the 2022 World Cup?','Argentina'],['Which country hosted the 2022 World Cup?','Qatar'],['Which club played at Camp Nou?','FC Barcelona'],['Which country has won the most men\'s World Cups?','Brazil'],['Who won the first World Cup in 1930?','Uruguay']]],
+['Map Room',[['What is the largest ocean?','Pacific Ocean'],['What is the capital of Japan?','Tokyo'],['Which country has had the largest population since 2023?','India'],['Mount Everest sits on the border of Nepal and which country?','China'],['What is the smallest country in the world?','Vatican City'],['Which African country has three capital cities?','South Africa']]],
+['Lab Coats',[['Which gas do plants absorb from the air?','Carbon dioxide'],['H2O is the formula for what?','Water'],['What is the chemical symbol for gold?','Au'],['What is the hardest natural substance?','Diamond'],["What is the most abundant gas in Earth's atmosphere?",'Nitrogen'],['Who described the three laws of motion?','Isaac Newton']]],
+['Big Ideas',[['Who is credited with inventing the telephone?','Alexander Graham Bell'],['Which company makes the iPhone?','Apple'],['Who invented the World Wide Web?','Tim Berners-Lee'],["In which year was the Wright brothers' first powered flight?",'1903'],['Which scholar wrote the Book of Optics around 1011?','Ibn al-Haytham'],["The word 'algorithm' comes from which mathematician's name?",'Al-Khwarizmi']]],
+['Word Play',[['How many letters are in the English alphabet?','26'],['How many letters are in the Arabic alphabet?','28'],["What is the plural of 'mouse' (the animal)?",'Mice'],["Which English word comes from the Arabic 'qahwa'?",'Coffee'],['A word that reads the same backwards is called what?','Palindrome'],["Which English word comes from the Arabic 'sukkar'?",'Sugar']]],
+['Time Machine',[['Who was the first President of the United States?','George Washington'],['In which country are the pyramids of Giza?','Egypt'],['In which year did World War II end?','1945'],['Which wall fell in 1989?','The Berlin Wall'],['Which Roman city was buried by Vesuvius in 79 AD?','Pompeii'],['Which empire was ruled from Constantinople until 1453?','Byzantine Empire']]],
+['Inside You',[['Which organ pumps blood around the body?','The heart'],['How many teeth does an adult usually have?','32'],['What is the largest organ of the human body?','Skin'],['How many bones are in the adult human body?','206'],['What is the smallest bone in the human body?','Stapes'],['Which blood type is the universal donor?','O negative']]],
+['Number Crunch',[['How many minutes are in an hour?','60'],['How many sides does a hexagon have?','6'],['What is 15% of 200?','30'],['What is the square root of 144?','12'],['How many seconds are in a day?','86,400'],['What is 50 in Roman numerals?','L']]]];
+
+const BANK_AR=[
+['الفضاء',[['أي كوكب يُعرف بالكوكب الأحمر؟','المريخ'],['ما اسم التابع الطبيعي للأرض؟','القمر'],['أي كوكب عنده أوضح نظام حلقات؟','زحل'],['منو أول إنسان مشى على القمر؟','نيل أرمسترونغ'],['ما اسم أكبر بركان في المجموعة الشمسية وموجود على المريخ؟','أوليمبوس مونس'],['أي مسبار أُطلق عام 1977 ويعتبر أبعد جسم صنعه الإنسان؟','فوييجر 1']]],
+['حول الخليج',[['ما هي عاصمة الكويت؟','مدينة الكويت'],['ما هي عملة السعودية؟','الريال السعودي'],['ما اسم أطول مبنى في العالم الموجود في دبي؟','برج خليفة'],['مسقط عاصمة أي دولة؟','عُمان'],['ما هي أكبر جزيرة كويتية؟','بوبيان'],['في أي سنة استقلت الكويت؟','1961']]],
+['المطبخ',[['السوشي من أي دولة؟','اليابان'],['ما المكون الأساسي في الحمص بالطحينة؟','الحمص (الحبوب)'],['أي بهار ذهبي هو الأغلى في العالم بالوزن؟','الزعفران'],['الغواكامولي مصنوع أساساً من أي فاكهة؟','الأفوكادو'],['أي جبن إيطالي يُستخدم في التيراميسو؟','الماسكاربوني'],['المرزبان مصنوع أساساً من أي مكسرات؟','اللوز']]],
+['عالم الحيوان',[['ما أسرع حيوان بري؟','الفهد'],['ما أكبر حيوان على وجه الأرض؟','الحوت الأزرق'],['كم قلب عند الأخطبوط؟','ثلاثة'],['ما اسم صغير الأسد؟','شبل'],['أي حيوان ثديي يبيض وعنده منقار يشبه البطة؟','خلد الماء (البلاتيبوس)'],['ماذا يخزّن الجمل في سنامه؟','الدهون']]],
+['كرة القدم',[['كم لاعب لكل فريق داخل الملعب؟','11'],['أي منتخب فاز بكأس العالم 2022؟','الأرجنتين'],['أي دولة استضافت كأس العالم 2022؟','قطر'],['أي نادي كان ملعبه كامب نو؟','برشلونة'],['أي منتخب فاز بأكثر عدد من كؤوس العالم للرجال؟','البرازيل'],['منو فاز بأول كأس عالم سنة 1930؟','الأوروغواي']]],
+['خريطة العالم',[['ما أكبر محيط في العالم؟','المحيط الهادئ'],['ما هي عاصمة اليابان؟','طوكيو'],['أي دولة صارت الأكثر سكاناً في العالم منذ 2023؟','الهند'],['جبل إيفرست يقع على الحدود بين نيبال وأي دولة؟','الصين'],['ما أصغر دولة في العالم؟','الفاتيكان'],['أي دولة أفريقية عندها ثلاث عواصم؟','جنوب أفريقيا']]],
+['المختبر',[['أي غاز تمتصه النباتات من الهواء؟','ثاني أكسيد الكربون'],['H2O هي صيغة أي مادة؟','الماء'],['ما الرمز الكيميائي للذهب؟','Au'],['ما أصلب مادة طبيعية؟','الألماس'],['ما أكثر غاز موجود في الغلاف الجوي للأرض؟','النيتروجين'],['منو العالِم صاحب قوانين الحركة الثلاثة؟','إسحاق نيوتن']]],
+['اختراعات',[['منو يُنسب له اختراع الهاتف؟','غراهام بيل'],['أي شركة تصنع الآيفون؟','آبل'],['منو مخترع الشبكة العنكبوتية (الويب)؟','تيم بيرنرز لي'],['في أي سنة كانت أول رحلة طيران للأخوين رايت؟','1903'],['أي عالِم عربي ألّف كتاب المناظر في البصريات؟','ابن الهيثم'],['كلمة "خوارزمية" مأخوذة من اسم أي عالِم رياضيات؟','الخوارزمي']]],
+['لغتنا',[['كم عدد حروف اللغة العربية؟','28'],['ما جمع كلمة "كتاب"؟','كُتب'],['ما عكس كلمة "شجاع"؟','جبان'],['أي كلمة إنجليزية أصلها كلمة "قهوة" العربية؟','Coffee'],['من هو الشاعر الملقب بـ"المتنبي"؟','أبو الطيب أحمد بن الحسين'],['كم عدد بحور الشعر العربي عند الخليل وتلميذه الأخفش؟','16']]],
+['آلة الزمن',[['في أي دولة تقع أهرامات الجيزة؟','مصر'],['منو أول رئيس للولايات المتحدة؟','جورج واشنطن'],['في أي سنة انتهت الحرب العالمية الثانية؟','1945'],['أي جدار سقط عام 1989؟','جدار برلين'],['أي مدينة رومانية دفنها بركان فيزوف عام 79م؟','بومبي'],['في أي سنة فتح العثمانيون القسطنطينية؟','1453']]],
+['جسم الإنسان',[['أي عضو يضخ الدم في الجسم؟','القلب'],['كم سن عند الإنسان البالغ عادةً؟','32'],['ما أكبر عضو في جسم الإنسان؟','الجلد'],['كم عظمة في جسم الإنسان البالغ؟','206'],['ما أصغر عظمة في جسم الإنسان؟','الركاب'],['أي فصيلة دم تعتبر المتبرع العام؟','O سالب']]],
+['أرقام',[['كم دقيقة في الساعة؟','60'],['كم ضلع للشكل السداسي؟','6'],['كم يساوي 15% من 200؟','30'],['ما الجذر التربيعي لـ 144؟','12'],['كم ثانية في اليوم؟','86400'],['كم سورة في القرآن الكريم؟','114']]]];
+
+let S=store.get('mt_state',null);
+let lang='ar',T=L.ar,timer=null,cur=null;
+const PTS=[200,200,400,400,600,600];
+
+function applyLang(){
+  T=L[lang];document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  $('tTitle').textContent=T.title;$('tTitle2').textContent=T.title;document.title=T.title;$('tLead').textContent=T.lead;
+  $('bRnd').textContent=T.rnd;drawChips();$('tRules').innerHTML=T.rules.map(r=>`<li>${esc(r)}</li>`).join('');
+  [['lA','A'],['lB','B'],['lLang','lang'],['lDiff','diff'],['lTime','time'],['bGo','go'],['tWeave','weave'],['bEnd','end'],['bNew','newg'],['bReveal','reveal'],['bBack','back'],['tWin','win'],['bAgain','again']].forEach(([id,k])=>$(id).textContent=T[k]);
+  $('nRecent').textContent=H&&qCount()?T.recent(qCount()):'';
+}
+$('iLang').onchange=e=>{lang=e.target.value;applyLang()};
+
+function show(v){['vSetup','vLoad','vBoard','vEnd'].forEach(x=>$(x).classList.toggle('hide',x!==v))}
+function save(){store.set('mt_state',S)}
+
+const CATS=[['space','الفضاء','Space'],['kuwait','الكويت زمان','Old Kuwait'],['gulf','الخليج العربي','The Gulf'],['history','آلة الزمن','History'],['islam','إسلاميات','Islamic knowledge'],['geography','جغرافيا','Geography'],['flags','أعلام ودول','Flags & countries'],['football','كرة القدم','Football'],['sports','رياضات','Sports'],['animals','عالم الحيوان','Animal kingdom'],['sea','البحر والغوص','Sea & diving'],['body','جسم الإنسان','Human body'],['science','علوم','Science'],['inventions','اختراعات','Inventions'],['tech','تكنولوجيا','Technology'],['games','ألعاب فيديو','Video games'],['tv','مسلسلات خليجية','Gulf TV series'],['cartoons','رسوم متحركة','Cartoons'],['movies','أفلام','Movies'],['music','أغاني وطرب','Music'],['poetry','شعر','Poetry'],['language','لغتنا العربية','Arabic language'],['proverbs','أمثال شعبية','Proverbs'],['food','المطبخ','Food'],['sweets','حلويات','Sweets'],['landmarks','معالم سياحية','Landmarks'],['cars','سيارات','Cars'],['brands','ماركات وشعارات','Brands & logos'],['numbers','أرقام','Numbers'],['riddles','ألغاز','Riddles']];
+const BANK_IDS=['space','gulf','food','animals','football','geography','science','inventions','language','history','body','numbers'];
+const catName=id=>{const c=CATS.find(c=>c[0]===id);return c?(lang==='ar'?c[1]:c[2]):id};
+let picks=store.get('mt_picks',[]).filter(id=>CATS.some(c=>c[0]===id)).slice(0,6);
+function drawChips(){
+  $('lPick').textContent=T.pick(picks.length);
+  $('chips').innerHTML=CATS.map(c=>`<button type="button" class="chip" data-chip="${c[0]}" aria-pressed="${picks.includes(c[0])}">${esc(lang==='ar'?c[1]:c[2])}</button>`).join('');
+}
+$('chips').onclick=e=>{const b=e.target.closest('[data-chip]');if(!b)return;const id=b.dataset.chip;
+  if(picks.includes(id))picks=picks.filter(x=>x!==id);else if(picks.length<6)picks.push(id);store.set('mt_picks',picks);drawChips()};
+$('bRnd').onclick=()=>{picks=CATS.map(c=>c[0]).sort(()=>Math.random()-.5).slice(0,6);store.set('mt_picks',picks);drawChips()};
+
+let H=null,HREF=null;
+const qCount=()=>H?Object.values(H.q).reduce((n,a)=>n+a.length,0):0;
+async function hist(){
+  if(H)return H;
+  const loc=store.get('mt_qhist',null);H={q:(loc&&loc.q)||{}};
+  try{
+    const[db,u]=await Promise.all([claude.use('db'),claude.use('user')]);
+    if(db&&u){const id=await u.id();HREF=db.collection('data/users/'+id).doc('qhistory');
+      const d=await Promise.race([HREF.get(),new Promise(r=>setTimeout(()=>r(null),8000))]);
+      const v=d&&typeof d.data==='function'?d.data():d;
+      if(v&&v.q)for(const k in v.q)H.q[k]=[...new Set([...(H.q[k]||[]),...v.q[k]])].slice(0,80)}
+  }catch(e){}
+  return H;
+}
+async function remember(cats){
+  const h=await hist();
+  cats.forEach(c=>{if(!c.id)return;h.q[c.id]=[...new Set([...c.qs.map(q=>`${q.q.slice(0,70)} → ${q.a}`),...(h.q[c.id]||[])])].slice(0,80)});
+  store.set('mt_qhist',h);if(HREF){try{await HREF.set({q:h.q})}catch(e){}}
+  $('nRecent').textContent=T.recent(qCount());
+}
+function prompt(ids,h){
+  const langName=lang==='ar'?'Arabic (Gulf/Kuwaiti-friendly Modern Standard Arabic)':'English';
+  const diff=$('iDiff').value;
+  return `You write questions for a two-team party trivia game (like a Kuwaiti diwaniya quiz night). Write everything in ${langName}.
+Return ONLY JSON, no prose: {"categories":[{"id":"...","questions":[{"points":200,"q":"...","a":"..."}]}]}
+Write questions for exactly these ${ids.length} categor${ids.length>1?'ies':'y'}, in this order (keep each id):
+${ids.map(id=>{const c=CATS.find(c=>c[0]===id);return `- id "${id}": ${c?c[2]+' / '+c[1]:id}`}).join('\n')}
+Each category has exactly 6 questions in this order of points: 200,200,400,400,600,600 (200 easy, 400 medium, 600 hard${diff==='easy'?'; keep everything on the easier side':diff==='hard'?'; make everything challenging':''}).
+Pick fresh, varied angles within each category; avoid the most obvious textbook questions.
+${ids.filter(id=>h.q[id]&&h.q[id].length).map(id=>`Already asked in "${id}" in earlier games. Do NOT repeat these questions or reuse these answers:\n${h.q[id].slice(0,60).join(' | ')}`).join('\n')}
+Rules: every answer must be short (1-5 words), unambiguous and certainly correct; avoid anything that may have changed recently; questions under 25 words; no two questions with the same answer. Variety seed ${Math.random().toString(36).slice(2,8)}.`;
+}
+function parse(text,ids){
+  const s=text.indexOf('{'),e=text.lastIndexOf('}');if(s<0||e<s)throw new Error('no json');
+  const j=JSON.parse(text.slice(s,e+1));const list=j.categories||[];
+  return ids.map((id,i)=>{const c=list.find(x=>x&&x.id===id)||list[i];if(!c)throw new Error('few');
+    const qs=(c.questions||[]).filter(q=>q&&q.q&&q.a).slice(0,6);if(qs.length<6)throw new Error('short');
+    qs.sort((x,y)=>(+x.points||0)-(+y.points||0));
+    return{id,name:catName(id),qs:qs.map((q,k)=>({p:PTS[k],q:String(q.q),a:String(q.a),by:-1}))}});
+}
+async function gen(ids,onN){
+  const sample=await claude.use('sample');if(!sample)return null;const h=await hist();
+  const r=await sample(prompt(ids,h),{cache:false,modelTier:'default',onText:({text})=>onN&&onN((text.match(/"q"\s*:/g)||[]).length)});
+  return parse(r.text,ids);
+}
+function bankBoard(ids){
+  const B=lang==='ar'?BANK_AR:BANK;const used=new Set();
+  const out=ids.map(id=>{const k=BANK_IDS.indexOf(id);if(k>=0){used.add(k);return k}return -1});
+  const spare=BANK_IDS.map((_,k)=>k).filter(k=>!used.has(k)).sort(()=>Math.random()-.5);
+  return out.map(k=>{if(k<0)k=spare.pop();const[name,qs]=B[k];return{id:null,name,qs:qs.map(([q,a],i)=>({p:PTS[i],q,a,by:-1}))}});
+}
+
+async function start(useBank){
+  $('eSetup').classList.add('hide');
+  if(picks.length<6){const rest=CATS.map(c=>c[0]).filter(id=>!picks.includes(id)).sort(()=>Math.random()-.5);picks=[...picks,...rest].slice(0,6);store.set('mt_picks',picks);drawChips()}
+  const ids=picks.slice();const teams=[$('iA').value.trim()||T.A,$('iB').value.trim()||T.B];
+  show('vLoad');$('pLoad').textContent=T.thinking;
+  let cats=null,src='bank';
+  if(!useBank){try{cats=await gen(ids,n=>{$('pLoad').textContent=n?T.writing(Math.min(n,36)):T.thinking});if(cats)src='ai'}
+    catch(e){show('vSetup');$('eSetup').innerHTML=`${esc(T.fail)} <button class="ghost" type="button" id="bBank" style="margin-top:8px">${esc(T.bank)}</button>`;$('eSetup').classList.remove('hide');$('bBank').onclick=()=>start(true);return}}
+  if(!cats)cats=bankBoard(ids);
+  if(src==='ai')await remember(cats);
+  S={lang,src,secs:+$('iTime').value,turn:0,teams:teams.map(n=>({n,s:0,life:{call:1,two:1,pit:1}})),cats};save();render();show('vBoard');
+}
+$('fSetup').onsubmit=e=>{e.preventDefault();start(false)};
+
+function teamHTML(i){
+  const t=S.teams[i];const lf=['call','two','pit'].map(k=>`<span class="pill${t.life[k]?'':' x'}">${esc(T[k])}</span>`).join('');
+  return `<div class="nm"><span>${esc(t.n)}</span><span class="adj"><button data-adj="${i},-100" aria-label="minus 100">−</button><button data-adj="${i},100" aria-label="plus 100">+</button></span></div><div class="sc">${t.s}</div><div class="pills">${lf}</div>`;
+}
+function render(){
+  lang=S.lang;applyLang();
+  [0,1].forEach(i=>{$('T'+i).innerHTML=teamHTML(i);$('T'+i).classList.toggle('on',S.turn===i)});
+  $('turnL').textContent=T.turn(S.teams[S.turn].n);
+  const fresh=S.cats.every(c=>c.qs.every(q=>q.by===-1));
+  $('board').innerHTML=S.cats.map((c,ci)=>`<div class="cat"><h3>${esc(c.name)}</h3><div class="tiles">${c.qs.map((q,qi)=>
+    q.by===-1?`<button class="tile" data-q="${ci},${qi}">${q.p}</button>`:`<button class="tile ${q.by===0?'ta':q.by===1?'tb':''}" disabled>${q.by>=0?esc(S.teams[q.by].n.slice(0,10)):'—'}</button>`).join('')}</div>${fresh&&S.src==='ai'&&c.id?`<button class="swap" data-swap="${ci}">${esc(T.swap)}</button>`:''}</div>`).join('');
+  $('nSrc').textContent=S.src==='ai'?T.srcAI:T.srcBank;
+}
+document.addEventListener('click',async e=>{
+  const a=e.target.closest('[data-adj]');if(a){const[i,d]=a.dataset.adj.split(',').map(Number);S.teams[i].s+=d;save();render();return}
+  const q=e.target.closest('[data-q]');if(q){const[ci,qi]=q.dataset.q.split(',').map(Number);openQ(ci,qi);return}
+  const sw=e.target.closest('[data-swap]');if(sw){const ci=+sw.dataset.swap;sw.disabled=true;sw.textContent='…';
+    try{const c=S.cats[ci];if(c.id){const r=await gen([c.id]);if(r){S.cats[ci]=r[0];await remember(r);save()}}}catch(err){}render()}
+});
+
+function openQ(ci,qi){
+  const q=S.cats[ci].qs[qi];cur={ci,qi,flags:{},phase:0,left:S.secs,revealed:false};
+  $('qCat').textContent=S.cats[ci].name;$('qPts').textContent=`${q.p} ${T.pts}`;$('qText').textContent=q.q;
+  $('qAns').textContent=q.a;$('qAns').classList.add('hide');$('qAward').classList.add('hide');$('bReveal').classList.remove('hide');
+  $('vQ').classList.remove('hide');qUI();clearInterval(timer);timer=setInterval(tick,1000);$('bReveal').focus();
+}
+function tick(){
+  if(cur.revealed)return;cur.left--;
+  if(cur.left<=0){if(cur.phase===0){cur.phase=1;cur.left=Math.max(15,Math.round(S.secs/2))}else{cur.phase=2;cur.left=0;clearInterval(timer)}}
+  qUI();
+}
+function qUI(){
+  const t=S.turn,o=1-t,who=cur.phase===1?o:t;
+  $('qin').style.setProperty('--tc',who===0?'var(--a)':'var(--b)');
+  $('qPhase').textContent=cur.phase===0?T.answering(S.teams[t].n):cur.phase===1?T.steal(S.teams[o].n):T.timeup;
+  $('qClock').textContent=cur.revealed?'':cur.left;$('qClock').classList.toggle('low',!cur.revealed&&cur.left<=10&&cur.phase<2);
+  $('qFlags').innerHTML=Object.keys(cur.flags).map(k=>`<b>${esc(T[k+'F'])}</b>`).join('');
+  const lf=S.teams[t].life;
+  $('qLifes').innerHTML=cur.revealed||cur.phase>0?'':['call','two','pit'].map(k=>`<button data-life="${k}" ${lf[k]&&!cur.flags[k]?'':'disabled'}>${esc(S.teams[t].n)}: ${esc(T[k])}</button>`).join('');
+}
+$('qLifes').onclick=e=>{const b=e.target.closest('[data-life]');if(!b)return;const k=b.dataset.life;S.teams[S.turn].life[k]=0;cur.flags[k]=1;if(k==='call')cur.left+=30;save();qUI()};
+$('bReveal').onclick=()=>{
+  cur.revealed=true;clearInterval(timer);$('qAns').classList.remove('hide');$('bReveal').classList.add('hide');
+  $('qAward').innerHTML=`<div style="width:100%;font-weight:800">${esc(T.who)}</div><button class="A" data-aw="0">${esc(S.teams[0].n)}</button><button class="B" data-aw="1">${esc(S.teams[1].n)}</button><button class="ghost" data-aw="-2">${esc(T.nobody)}</button>`;
+  $('qAward').classList.remove('hide');qUI();
+};
+$('qAward').onclick=e=>{const b=e.target.closest('[data-aw]');if(!b)return;const w=+b.dataset.aw;const q=S.cats[cur.ci].qs[cur.qi];
+  if(w>=0){S.teams[w].s+=q.p;if(cur.flags.pit&&w===S.turn)S.teams[1-w].s-=q.p}
+  q.by=w;S.turn=1-S.turn;save();closeQ();
+  if(S.cats.every(c=>c.qs.every(x=>x.by!==-1)))finish();
+};
+function closeQ(){clearInterval(timer);$('vQ').classList.add('hide');render()}
+$('bBack').onclick=()=>{if(cur&&Object.keys(cur.flags).length){/* lifelines stay spent */}closeQ()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('vQ').classList.contains('hide'))closeQ()});
+
+function finish(){
+  const[a,b]=S.teams;show('vEnd');
+  $('winN').textContent=a.s===b.s?T.tie:(a.s>b.s?a.n:b.n);$('winS').textContent=`${a.n} ${a.s} — ${b.s} ${b.n}`;
+  S.over=true;save();
+}
+$('bEnd').onclick=finish;
+const toSetup=()=>{S=null;store.set('mt_state',null);applyLang();show('vSetup')};
+$('bNew').onclick=toSetup;$('bAgain').onclick=toSetup;
+
+if(S&&!S.over&&S.cats){render();show('vBoard')}else{applyLang();show('vSetup')}
+hist().then(()=>applyLang());
+}
+</script>
+</body>
+</html>
